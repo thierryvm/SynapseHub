@@ -31,6 +31,12 @@ fn focus_window(pid: u32) {
     focus::focus_window_by_pid(pid);
 }
 
+/// Quits the application entirely.
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 /// Placeholder for the settings window (Phase 2).
 #[tauri::command]
 async fn open_settings(app: AppHandle) {
@@ -170,6 +176,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_sessions,
             focus_window,
+            quit_app,
             open_settings,
         ])
         .run(tauri::generate_context!())

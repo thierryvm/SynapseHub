@@ -169,11 +169,11 @@ function render(): void {
 // ─── Event listeners ───────────────────────────────────────────────────────────
 
 btnMinimize.addEventListener("click", () => {
-  getCurrentWindow().minimize().catch(console.error);
+  getCurrentWindow().hide().catch(console.error);
 });
 
 btnClose.addEventListener("click", () => {
-  getCurrentWindow().hide().catch(console.error);
+  invoke("quit_app").catch(console.error);
 });
 
 btnSettings.addEventListener("click", () => {
