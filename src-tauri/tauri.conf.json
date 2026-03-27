@@ -43,5 +43,13 @@
       "icons/icon.ico"
     ],
     "resources": ["icons/tray.png"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "PUBKEY_PLACEHOLDER",
+      "endpoints": [
+        "https://github.com/thierryvm/SynapseHub/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
