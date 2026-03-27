@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset:; connect-src ipc: http://ipc.localhost"
+    />
+    <title>SynapseHub</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="header">
+        <div class="header-brand">
+          <svg class="logo-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.9"/>
+            <circle cx="4" cy="6" r="2" fill="currentColor" opacity="0.6"/>
+            <circle cx="20" cy="6" r="2" fill="currentColor" opacity="0.6"/>
+            <circle cx="4" cy="18" r="2" fill="currentColor" opacity="0.6"/>
+            <circle cx="20" cy="18" r="2" fill="currentColor" opacity="0.6"/>
+            <line x1="12" y1="12" x2="4" y2="6" stroke="currentColor" stroke-width="1.2" opacity="0.4"/>
+            <line x1="12" y1="12" x2="20" y2="6" stroke="currentColor" stroke-width="1.2" opacity="0.4"/>
+            <line x1="12" y1="12" x2="4" y2="18" stroke="currentColor" stroke-width="1.2" opacity="0.4"/>
+            <line x1="12" y1="12" x2="20" y2="18" stroke="currentColor" stroke-width="1.2" opacity="0.4"/>
+          </svg>
+          <span class="logo-text">SynapseHub</span>
+        </div>
+        <div class="header-meta">
+          <span class="agent-badge" id="agent-badge">—</span>
+          <button class="icon-btn" id="btn-minimize" title="Réduire" aria-label="Minimize">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="icon-btn" id="btn-close" title="Fermer" aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="divider"></div>
+
+      <main class="agent-list" id="agent-list">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.2" opacity="0.3"/>
+              <path d="M12 7v5l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.5"/>
+            </svg>
+          </div>
+          <p class="empty-title">Aucun agent actif</p>
+          <p class="empty-sub">Lance Claude Code dans ton IDE pour commencer</p>
+        </div>
+      </main>
+
+      <div class="divider"></div>
+
+      <footer class="footer">
+        <div class="footer-status" id="footer-status">
+          <span class="status-dot status-dot--ok"></span>
+          <span class="footer-text">Surveillance active</span>
+        </div>
+        <div class="footer-actions">
+          <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Settings">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <span class="version-label">v0.1.0</span>
+        </div>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

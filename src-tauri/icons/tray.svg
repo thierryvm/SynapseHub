@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!--
+    Tray icon — designed for legibility at 16×16 and 32×32.
+    Two variants handled via CSS/platform:
+      • Default: white (works on dark taskbars — Windows, macOS dark mode)
+      • The PNG exports at multiple sizes are auto-generated.
+  -->
+  <defs>
+    <linearGradient id="tray-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#00D1FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Connection lines -->
+  <line x1="16" y1="16" x2="5"  y2="6"  stroke="url(#tray-grad)" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+  <line x1="16" y1="16" x2="27" y2="6"  stroke="url(#tray-grad)" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+  <line x1="16" y1="16" x2="5"  y2="26" stroke="url(#tray-grad)" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+  <line x1="16" y1="16" x2="27" y2="26" stroke="url(#tray-grad)" stroke-width="1.8" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Outer nodes -->
+  <circle cx="5"  cy="6"  r="3" fill="#818CF8"/>
+  <circle cx="27" cy="6"  r="3" fill="#00D1FF"/>
+  <circle cx="5"  cy="26" r="3" fill="#6366F1"/>
+  <circle cx="27" cy="26" r="3" fill="#00D1FF"/>
+
+  <!-- Center node -->
+  <circle cx="16" cy="16" r="5.5" fill="url(#tray-grad)"/>
+</svg>

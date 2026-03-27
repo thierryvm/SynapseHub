@@ -1,0 +1,32 @@
+# Node
+node_modules/
+dist/
+.env*
+*.local
+
+# Rust
+target/
+src-tauri/target/
+
+# Tauri
+src-tauri/gen/
+
+# SynapseHub — NEVER commit these
+# (hook token and port are generated locally per machine)
+config/hook_token
+config/hook_port
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*

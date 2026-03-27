@@ -1,0 +1,517 @@
+/* ─── Reset & base ─────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── Design tokens ─────────────────────────────────────────────────────────── */
+
+:root {
+  /* Surfaces */
+  --bg-base:          oklch(10% 0.015 260);
+  --bg-surface:       oklch(13% 0.015 260);
+  --bg-elevated:      oklch(17% 0.018 260);
+  --bg-hover:         oklch(20% 0.018 260);
+
+  /* Borders */
+  --border-subtle:    oklch(100% 0 0 / 0.06);
+  --border-default:   oklch(100% 0 0 / 0.09);
+
+  /* Text */
+  --text-primary:     oklch(94% 0.008 250);
+  --text-secondary:   oklch(60% 0.010 250);
+  --text-muted:       oklch(42% 0.008 250);
+
+  /* Status — Running */
+  --cyan-500:         oklch(78% 0.15 200);
+  --cyan-400:         oklch(84% 0.13 200);
+  --cyan-glow:        oklch(78% 0.15 200 / 0.25);
+
+  /* Status — Waiting */
+  --amber-500:        oklch(79% 0.17 60);
+  --amber-400:        oklch(85% 0.15 60);
+  --amber-glow:       oklch(79% 0.17 60 / 0.25);
+
+  /* Status — Idle */
+  --gray-500:         oklch(50% 0.008 250);
+  --gray-glow:        oklch(50% 0.008 250 / 0.15);
+
+  /* Accent */
+  --indigo-500:       oklch(60% 0.20 270);
+  --indigo-glow:      oklch(60% 0.20 270 / 0.20);
+
+  /* Timing */
+  --ease-out:         cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast:    120ms;
+  --duration-base:    200ms;
+
+  /* Layout */
+  --radius-sm:        6px;
+  --radius-md:        10px;
+  --radius-lg:        14px;
+  --radius-full:      9999px;
+
+  /* Typography */
+  --font-sans: "Inter", "Segoe UI Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace;
+}
+
+/* ─── Body ──────────────────────────────────────────────────────────────────── */
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+/* ─── App shell ─────────────────────────────────────────────────────────────── */
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  /* Subtle inner shadow to reinforce depth */
+  box-shadow:
+    inset 0 1px 0 oklch(100% 0 0 / 0.05),
+    0 0 0 1px var(--border-subtle);
+}
+
+/* ─── Header ────────────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  gap: 8px;
+  /* Drag region for the frameless window */
+  -webkit-app-region: drag;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+
+.logo-icon {
+  color: var(--indigo-500);
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.agent-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  transition: color var(--duration-base) var(--ease-out);
+}
+
+.agent-badge[data-count]:not([data-count="0"]) {
+  color: var(--cyan-400);
+  border-color: oklch(78% 0.15 200 / 0.2);
+}
+
+/* ─── Divider ───────────────────────────────────────────────────────────────── */
+
+.divider {
+  height: 1px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+/* ─── Agent list ────────────────────────────────────────────────────────────── */
+
+.agent-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-elevated) transparent;
+}
+
+.agent-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.agent-list::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-full);
+}
+
+/* ─── Agent card ────────────────────────────────────────────────────────────── */
+
+.agent-card {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 11px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.agent-card:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
+}
+
+/* Status variant: running */
+.agent-card[data-status="running"]:hover {
+  box-shadow: 0 0 0 1px oklch(78% 0.15 200 / 0.15), 0 2px 12px oklch(78% 0.15 200 / 0.06);
+}
+
+/* Status variant: waiting */
+.agent-card[data-status="waiting"] {
+  background: oklch(13% 0.015 260);
+  border-color: oklch(79% 0.17 60 / 0.18);
+  box-shadow: 0 0 0 1px oklch(79% 0.17 60 / 0.08);
+}
+
+.agent-card[data-status="waiting"]:hover {
+  background: oklch(15% 0.018 260);
+  border-color: oklch(79% 0.17 60 / 0.28);
+  box-shadow: 0 0 0 1px oklch(79% 0.17 60 / 0.15), 0 2px 12px oklch(79% 0.17 60 / 0.08);
+}
+
+/* ─── Status indicator ──────────────────────────────────────────────────────── */
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  margin-top: 3px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.status-indicator::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--radius-full);
+  opacity: 0;
+}
+
+/* Running — pulsing cyan */
+.status-indicator[data-status="running"] {
+  background: var(--cyan-500);
+  box-shadow: 0 0 6px var(--cyan-glow);
+  animation: pulse-running 2.4s ease-in-out infinite;
+}
+
+/* Waiting — pulsing amber */
+.status-indicator[data-status="waiting"] {
+  background: var(--amber-500);
+  box-shadow: 0 0 8px var(--amber-glow);
+  animation: pulse-waiting 1.6s ease-in-out infinite;
+}
+
+/* Idle */
+.status-indicator[data-status="idle"] {
+  background: var(--gray-500);
+}
+
+@keyframes pulse-running {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--cyan-glow); }
+  50%       { opacity: 0.6; box-shadow: 0 0 12px var(--cyan-glow); }
+}
+
+@keyframes pulse-waiting {
+  0%, 100% { opacity: 1;   box-shadow: 0 0 8px var(--amber-glow); transform: scale(1); }
+  50%       { opacity: 0.7; box-shadow: 0 0 16px var(--amber-glow); transform: scale(1.15); }
+}
+
+/* ─── Card content ──────────────────────────────────────────────────────────── */
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.card-project {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.card-branch {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--indigo-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.card-ide {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.card-sep {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+.card-status-label {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.card-status-label[data-status="running"] { color: var(--cyan-400); }
+.card-status-label[data-status="waiting"] { color: var(--amber-400); }
+.card-status-label[data-status="idle"]    { color: var(--gray-500); }
+
+.card-duration {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* ─── Focus button ──────────────────────────────────────────────────────────── */
+
+.card-focus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+  -webkit-app-region: no-drag;
+}
+
+.agent-card:hover .card-focus {
+  opacity: 1;
+}
+
+.card-focus:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+/* Waiting variant — always show focus button */
+.agent-card[data-status="waiting"] .card-focus {
+  opacity: 1;
+  color: var(--amber-400);
+  border-color: oklch(79% 0.17 60 / 0.2);
+}
+
+.agent-card[data-status="waiting"] .card-focus:hover {
+  background: oklch(79% 0.17 60 / 0.1);
+  border-color: oklch(79% 0.17 60 / 0.35);
+  color: var(--amber-400);
+}
+
+/* ─── Empty state ───────────────────────────────────────────────────────────── */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.empty-icon {
+  color: var(--text-muted);
+  opacity: 0.5;
+  margin-bottom: 4px;
+}
+
+.empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.empty-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 200px;
+}
+
+/* ─── Footer ────────────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  flex-shrink: 0;
+}
+
+.footer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.status-dot--ok    { background: var(--cyan-500); box-shadow: 0 0 4px var(--cyan-glow); }
+.status-dot--error { background: oklch(65% 0.22 25); }
+
+.footer-text {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  opacity: 0.6;
+}
+
+/* ─── Shared icon button ────────────────────────────────────────────────────── */
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+  -webkit-app-region: no-drag;
+}
+
+.icon-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+/* ─── Notification flash (agent-card enters) ────────────────────────────────── */
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.agent-card {
+  animation: card-enter var(--duration-base) var(--ease-out) both;
+}
+
+/* ─── Waiting badge on tray (shown in card header area) ────────────────────── */
+
+.waiting-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  background: oklch(79% 0.17 60 / 0.12);
+  border: 1px solid oklch(79% 0.17 60 / 0.25);
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--amber-400);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
