@@ -169,7 +169,7 @@ function render(): void {
 // ─── Event listeners ───────────────────────────────────────────────────────────
 
 btnMinimize.addEventListener("click", () => {
-  getCurrentWindow().hide().catch(console.error);
+  invoke("hide_window").catch(console.error);
 });
 
 btnClose.addEventListener("click", () => {
