@@ -31,6 +31,20 @@ fn focus_window(pid: u32) {
     focus::focus_window_by_pid(pid);
 }
 
+/// Hides the dashboard window (minimize to tray).
+#[tauri::command]
+fn hide_window(app: AppHandle) {
+    if let Some(win) = app.get_webview_window("dashboard") {
+        let _ = win.hide();
+    }
+}
+
+/// Quits the application entirely.
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
 /// Placeholder for the settings window (Phase 2).
 #[tauri::command]
 async fn open_settings(app: AppHandle) {
@@ -170,6 +184,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_sessions,
             focus_window,
+            hide_window,
+            quit_app,
             open_settings,
         ])
         .run(tauri::generate_context!())
