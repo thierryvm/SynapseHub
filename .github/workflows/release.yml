@@ -70,6 +70,6 @@ jobs:
             ### First-time setup
             After installing, run SynapseHub once to generate your hook token, then follow the
             [hook setup guide](https://github.com/thierryvm/SynapseHub/blob/main/docs/hook-setup.md) to connect Claude Code.
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}

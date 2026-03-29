@@ -1,5 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import packageJson from "../package.json";
 import {
   type AgentSession,
   getStatusDuration,
@@ -23,6 +25,12 @@ const btnCloseSettings = document.getElementById("btn-close-settings")!;
 const btnCopyConfig = document.getElementById("btn-copy-config")!;
 const configCode = document.getElementById("config-code")!;
 const modalStatus = document.getElementById("modal-status")!;
+const versionLabel = document.getElementById("version-label")!;
+const updateSummaryText = document.getElementById("update-summary")!;
+const updateMeta = document.getElementById("update-meta")!;
+const updateProgress = document.getElementById("update-progress")!;
+const btnCheckUpdates = document.getElementById("btn-check-updates") as HTMLButtonElement;
+const btnInstallUpdate = document.getElementById("btn-install-update") as HTMLButtonElement;
 
 const heroKicker = document.getElementById("hero-kicker")!;
 const heroTitle = document.getElementById("hero-title")!;
@@ -35,6 +43,12 @@ const waitingMeta = document.getElementById("waiting-meta")!;
 const projectsMeta = document.getElementById("projects-meta")!;
 const sectionCount = document.getElementById("section-count")!;
 const footerDetail = document.getElementById("footer-detail")!;
+
+let availableUpdate: Update | null = null;
+let lastUpdateCheckLabel = "Aucune vérification récente";
+let isCheckingUpdates = false;
+let isInstallingUpdate = false;
+const APP_VERSION_LABEL = `v${packageJson.version}`;
 
 function createPill(label: string, ...classNames: string[]): HTMLSpanElement {
   const pill = document.createElement("span");
@@ -67,10 +81,166 @@ function createFocusButton(projectLabel: string): HTMLButtonElement {
   return button;
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function setUpdateControls(): void {
+  btnCheckUpdates.disabled = isCheckingUpdates || isInstallingUpdate;
+  btnInstallUpdate.disabled = !availableUpdate || isCheckingUpdates || isInstallingUpdate;
+  btnInstallUpdate.style.display = availableUpdate ? "inline-flex" : "none";
+
+  if (isCheckingUpdates) {
+    btnCheckUpdates.textContent = "Vérification…";
+  } else {
+    btnCheckUpdates.textContent = "Rechercher";
+  }
+
+  if (isInstallingUpdate) {
+    btnInstallUpdate.textContent = "Installation…";
+  } else {
+    btnInstallUpdate.textContent = "Installer";
+  }
+}
+
+function setUpdateDisplay(summary: string, meta: string, progress = ""): void {
+  updateSummaryText.textContent = summary;
+  updateMeta.textContent = meta;
+  updateProgress.textContent = progress;
+  setUpdateControls();
+}
+
+function setVersionLabel(suffix?: string): void {
+  versionLabel.textContent = suffix ? `${APP_VERSION_LABEL} · ${suffix}` : APP_VERSION_LABEL;
+}
+
+async function checkForUpdates(userInitiated: boolean): Promise<void> {
+  if (isCheckingUpdates || isInstallingUpdate) {
+    return;
+  }
+
+  isCheckingUpdates = true;
+  setUpdateDisplay(
+    "Recherche de mise à jour en cours…",
+    "SynapseHub interroge la dernière release publiée et signée.",
+  );
+
+  try {
+    const update = await check();
+    availableUpdate = update;
+    lastUpdateCheckLabel = `Dernière vérification: ${new Date().toLocaleTimeString("fr-BE", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+
+    if (update) {
+      setVersionLabel("update prête");
+      setUpdateDisplay(
+        `Version ${update.version} disponible`,
+        update.body?.trim() || `Version actuelle ${update.currentVersion}. Installation en un clic.`,
+        lastUpdateCheckLabel,
+      );
+    } else if (userInitiated) {
+      setVersionLabel();
+      setUpdateDisplay(
+        "Application à jour",
+        "Vous utilisez déjà la dernière version publiée de SynapseHub.",
+        lastUpdateCheckLabel,
+      );
+    } else {
+      setVersionLabel();
+      setUpdateDisplay(
+        "Aucune mise à jour détectée",
+        "SynapseHub est déjà synchronisé avec la dernière release publiée.",
+        lastUpdateCheckLabel,
+      );
+    }
+  } catch (error) {
+    availableUpdate = null;
+    setVersionLabel();
+    setUpdateDisplay(
+      "Vérification indisponible",
+      "La mise à jour n’a pas pu être vérifiée. Vérifiez qu’une release GitHub publiée existe.",
+      userInitiated ? "Réessayez dans quelques instants." : "",
+    );
+    console.error("Failed to check for updates:", error);
+  } finally {
+    isCheckingUpdates = false;
+    setUpdateControls();
+  }
+}
+
+async function installUpdate(): Promise<void> {
+  if (isInstallingUpdate) {
+    return;
+  }
+
+  if (!availableUpdate) {
+    await checkForUpdates(true);
+    if (!availableUpdate) {
+      return;
+    }
+  }
+
+  isInstallingUpdate = true;
+  let downloadedBytes = 0;
+  let totalBytes = 0;
+  setUpdateDisplay(
+    `Installation de ${availableUpdate.version}`,
+    "Téléchargement sécurisé en cours…",
+    "Préparation du paquet de mise à jour.",
+  );
+
+  try {
+    await availableUpdate.downloadAndInstall((event) => {
+      switch (event.event) {
+        case "Started":
+          totalBytes = event.data.contentLength ?? 0;
+          updateProgress.textContent =
+            totalBytes > 0
+              ? `Téléchargement: 0 / ${formatBytes(totalBytes)}`
+              : "Téléchargement démarré";
+          break;
+        case "Progress":
+          downloadedBytes += event.data.chunkLength;
+          updateProgress.textContent =
+            totalBytes > 0
+              ? `Téléchargement: ${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}`
+              : `Téléchargement: ${formatBytes(downloadedBytes)}`;
+          break;
+        case "Finished":
+          updateProgress.textContent = "Paquet reçu, installation locale en cours…";
+          break;
+      }
+    });
+
+    availableUpdate = null;
+    setVersionLabel("relance conseillée");
+    setUpdateDisplay(
+      "Mise à jour installée",
+      "Relancez SynapseHub si le redémarrage n’est pas automatique sur votre machine.",
+      lastUpdateCheckLabel,
+    );
+  } catch (error) {
+    setUpdateDisplay(
+      "Installation interrompue",
+      "La mise à jour n’a pas pu être appliquée. La version actuelle reste intacte.",
+      "Consultez la console si vous avez besoin du détail technique.",
+    );
+    console.error("Failed to install update:", error);
+  } finally {
+    isInstallingUpdate = false;
+    setUpdateControls();
+  }
+}
+
 function renderCard(session: AgentSession): HTMLElement {
   const statusKey = getStatusKey(session.status);
   const duration = getStatusDuration(session.status);
   const projectLabel = session.project_name || projectNameFromPath(session.project_path);
+  const canFocusWindow = session.pid > 0;
 
   const card = document.createElement("article");
   card.className = "agent-card";
@@ -102,6 +272,10 @@ function renderCard(session: AgentSession): HTMLElement {
   signal.append(indicator, textBlock);
 
   const focusBtn = createFocusButton(projectLabel);
+  focusBtn.disabled = !canFocusWindow;
+  if (!canFocusWindow) {
+    focusBtn.title = "Aucune fenêtre locale disponible";
+  }
   topLine.append(signal, focusBtn);
 
   const strip = document.createElement("div");
@@ -111,7 +285,7 @@ function renderCard(session: AgentSession): HTMLElement {
   if (session.git_branch) {
     strip.append(createPill(`⎇ ${session.git_branch}`, "pill--branch"));
   } else {
-    strip.append(createPill("No branch", "pill--ghost"));
+    strip.append(createPill("Aucune branche", "pill--ghost"));
   }
 
   const statusPill = createPill(
@@ -142,11 +316,15 @@ function renderCard(session: AgentSession): HTMLElement {
       invoke("acknowledge_waiting", { projectPath: session.project_path }).catch(console.error);
     }
 
-    invoke("focus_window", { pid: session.pid }).catch(console.error);
+    if (canFocusWindow) {
+      invoke("focus_window", { pid: session.pid }).catch(console.error);
+    }
   };
 
-  card.addEventListener("click", handleFocus);
-  focusBtn.addEventListener("click", handleFocus);
+  if (canFocusWindow || session.status.type === "Waiting") {
+    card.addEventListener("click", handleFocus);
+    focusBtn.addEventListener("click", handleFocus);
+  }
 
   return card;
 }
@@ -155,7 +333,7 @@ function updateSummary(): void {
   const summary = summarizeSessions(sessions);
   const waitingSessions = sessions.filter((session) => session.status.type === "Waiting");
 
-  heroKicker.textContent = waitingSessions.length > 0 ? "Attention requise" : "Monitoring local";
+  heroKicker.textContent = waitingSessions.length > 0 ? "Attention requise" : "Surveillance locale";
   heroTitle.textContent = summary.title;
   heroSubtitle.textContent = summary.subtitle;
 
@@ -197,7 +375,7 @@ function render(): void {
 
   updateSummary();
   document.title =
-    activeSessions.length > 0 ? `SynapseHub — ${activeSessions.length} sessions live` : "SynapseHub";
+    activeSessions.length > 0 ? `SynapseHub — ${activeSessions.length} sessions actives` : "SynapseHub";
 }
 
 btnMinimize.addEventListener("click", () => {
@@ -226,6 +404,7 @@ btnSettings.addEventListener("click", async () => {
 
     modalStatus.textContent = "";
     settingsModal.style.display = "flex";
+    void checkForUpdates(false);
   } catch (error) {
     modalStatus.textContent = "Impossible de charger la configuration";
     settingsModal.style.display = "flex";
@@ -235,6 +414,18 @@ btnSettings.addEventListener("click", async () => {
 
 btnCloseSettings.addEventListener("click", () => {
   settingsModal.style.display = "none";
+});
+
+settingsModal.addEventListener("click", (event) => {
+  if (event.target === settingsModal) {
+    settingsModal.style.display = "none";
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && settingsModal.style.display !== "none") {
+    settingsModal.style.display = "none";
+  }
 });
 
 btnCopyConfig.addEventListener("click", async () => {
@@ -252,6 +443,14 @@ btnCopyConfig.addEventListener("click", async () => {
   }
 });
 
+btnCheckUpdates.addEventListener("click", () => {
+  void checkForUpdates(true);
+});
+
+btnInstallUpdate.addEventListener("click", () => {
+  void installUpdate();
+});
+
 listen<AgentSession[]>("agents-updated", (event) => {
   sessions = event.payload;
   render();
@@ -261,6 +460,7 @@ async function init(): Promise<void> {
   try {
     sessions = await invoke<AgentSession[]>("get_sessions");
     render();
+    void checkForUpdates(false);
   } catch (error) {
     console.error("Failed to load initial sessions:", error);
   }
