@@ -93,10 +93,7 @@ fn normalize_project_path(path: &Path) -> Option<String> {
 
 /// Fast filter to avoid probing arbitrary command line flags as filesystem paths.
 fn looks_like_project_path_arg(arg: &str) -> bool {
-    arg.contains(":\\")
-        || arg.contains('\\')
-        || arg.contains('/')
-        || Path::new(arg).exists()
+    arg.contains(":\\") || arg.contains('\\') || arg.contains('/') || Path::new(arg).exists()
 }
 
 /// Extracts a plausible project directory from the process cwd and arguments.
@@ -562,7 +559,9 @@ mod tests {
     fn path_arg_filter_ignores_plain_flags_and_accepts_real_paths() {
         assert!(!looks_like_project_path_arg("--port"));
         assert!(!looks_like_project_path_arg("serve"));
-        assert!(looks_like_project_path_arg("F:\\PROJECTS\\Apps\\SynapseHub"));
+        assert!(looks_like_project_path_arg(
+            "F:\\PROJECTS\\Apps\\SynapseHub"
+        ));
         assert!(looks_like_project_path_arg("./src"));
     }
 }
