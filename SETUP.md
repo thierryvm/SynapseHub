@@ -26,7 +26,7 @@ If missing: https://developer.microsoft.com/en-us/microsoft-edge/webview2/
 ### Linux extra dependencies
 ```bash
 sudo apt-get install -y \
-  libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf wmctrl
+  libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf wmctrl pkg-config
 ```
 
 ---

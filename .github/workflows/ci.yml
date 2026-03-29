@@ -10,8 +10,28 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  frontend:
+    name: Frontend — install / build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: npm run build
+        run: npm run build
+
   rust:
-    name: Rust — check / clippy / test
+    name: Rust — fmt / check / clippy / test
     runs-on: ubuntu-latest
 
     steps:
@@ -48,6 +68,10 @@ jobs:
       - name: cargo check
         working-directory: src-tauri
         run: cargo check --all-features
+
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --check
 
       - name: cargo clippy
         working-directory: src-tauri

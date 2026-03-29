@@ -4,10 +4,10 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tokio::sync::Mutex;
+use sysinfo::{Pid, System};
 use tauri::AppHandle;
 use tauri::Emitter;
-use sysinfo::{Pid, System};
+use tokio::sync::Mutex;
 
 use crate::types::{AgentSession, AgentStatus, AppState, LockFile, WaitingState};
 
@@ -96,11 +96,7 @@ fn scan_lock_files(
             continue;
         }
 
-        let project_path = lock
-            .workspace_folders
-            .first()
-            .cloned()
-            .unwrap_or_default();
+        let project_path = lock.workspace_folders.first().cloned().unwrap_or_default();
 
         let lock_file = path.to_string_lossy().into_owned();
 
@@ -114,7 +110,8 @@ fn scan_lock_files(
                 .process(Pid::from_u32(lock.pid))
                 .map(|p| p.cpu_usage())
                 .unwrap_or(0.0);
-            let active_polls = if waiting.pid == Some(lock.pid) && cpu_usage >= RESUME_CPU_THRESHOLD {
+            let active_polls = if waiting.pid == Some(lock.pid) && cpu_usage >= RESUME_CPU_THRESHOLD
+            {
                 let votes = resume_votes.entry(project_path.clone()).or_insert(0);
                 *votes = votes.saturating_add(1);
                 *votes
@@ -174,7 +171,7 @@ fn scan_processes(
 
     for (pid, process) in sys.processes() {
         let name_lower = process.name().to_string_lossy().to_lowercase();
-        
+
         let mut ide_name = None;
 
         // Identification de l'agent
@@ -197,12 +194,17 @@ fn scan_processes(
         }
 
         // Si le nom du processus est un host commun (Node, JS, bash, pwsh), on vérifie les arguments
-        let cmd_joined = process.cmd().iter()
+        let cmd_joined = process
+            .cmd()
+            .iter()
             .map(|arg| arg.to_string_lossy().to_lowercase())
             .collect::<Vec<String>>()
             .join(" ");
 
-        if cmd_joined.contains("claude-code") || cmd_joined.contains("@anthropic-ai") || cmd_joined.contains("claude.cmd") {
+        if cmd_joined.contains("claude-code")
+            || cmd_joined.contains("@anthropic-ai")
+            || cmd_joined.contains("claude.cmd")
+        {
             ide_name = Some("Claude Code Terminal");
         }
 
@@ -212,17 +214,29 @@ fn scan_processes(
         };
 
         // Determine project path from cwd or command line arguments
-        let mut cwd = process.cwd().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
-        
+        let mut cwd = process
+            .cwd()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default();
+
         let mut cwd_lower = cwd.to_lowercase();
-        if cwd.is_empty() || cwd_lower.contains("program files") || cwd_lower.contains("appdata") || cwd_lower.contains("/usr/bin") || cwd_lower.contains("/usr/lib") || cwd == "/" {
+        if cwd.is_empty()
+            || cwd_lower.contains("program files")
+            || cwd_lower.contains("appdata")
+            || cwd_lower.contains("/usr/bin")
+            || cwd_lower.contains("/usr/lib")
+            || cwd == "/"
+        {
             // Cherche dans les arguments command-line une éventuelle arborescence de projet existante
             for arg_os in process.cmd() {
                 let arg_str = arg_os.to_string_lossy().into_owned();
                 let path = std::path::Path::new(&arg_str);
                 if path.is_dir() {
                     let arg_lower = arg_str.to_lowercase();
-                    if !arg_lower.contains("program files") && !arg_lower.contains("appdata") && arg_str != "/" {
+                    if !arg_lower.contains("program files")
+                        && !arg_lower.contains("appdata")
+                        && arg_str != "/"
+                    {
                         cwd = arg_str;
                         break;
                     }
@@ -232,12 +246,12 @@ fn scan_processes(
         }
 
         // Ignore system paths or typical non-project folders
-        if cwd_lower.contains("program files") 
-            || cwd_lower.contains("appdata") 
+        if cwd_lower.contains("program files")
+            || cwd_lower.contains("appdata")
             || cwd_lower.contains("/usr/bin")
             || cwd_lower.contains("/usr/lib")
-            || cwd == "/" 
-            || cwd.is_empty() 
+            || cwd == "/"
+            || cwd.is_empty()
         {
             continue;
         }
@@ -256,8 +270,9 @@ fn scan_processes(
             .or_insert_with(now_secs);
 
         let status = if let Some(waiting) = waiting_since.get(&cwd) {
-            let active_polls =
-                if waiting.pid == Some(pid.as_u32()) && process.cpu_usage() >= RESUME_CPU_THRESHOLD {
+            let active_polls = if waiting.pid == Some(pid.as_u32())
+                && process.cpu_usage() >= RESUME_CPU_THRESHOLD
+            {
                 let votes = resume_votes.entry(cwd.clone()).or_insert(0);
                 *votes = votes.saturating_add(1);
                 *votes
@@ -300,15 +315,14 @@ fn scan_processes(
 
 /// Background task: polls lock files every 2 s and emits `agents-updated`.
 pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
-    use sysinfo::{RefreshKind, ProcessRefreshKind, UpdateKind};
-    
+    use sysinfo::{ProcessRefreshKind, RefreshKind, UpdateKind};
+
     // Optimisation majeure du CPU : on informe sysinfo de ne scanner que le strict nécessaire
     let refresh_kind = RefreshKind::nothing().with_processes(
         ProcessRefreshKind::nothing()
             .with_cpu()
             .with_exe(UpdateKind::OnlyIfNotSet)
-            .with_cmd(UpdateKind::OnlyIfNotSet)
-            // On ne demande ni la RAM ni le CPU de chaque process, ce qui est très lourd
+            .with_cmd(UpdateKind::OnlyIfNotSet), // On ne demande ni la RAM ni le CPU de chaque process, ce qui est très lourd
     );
     let mut sys = System::new_with_specifics(refresh_kind);
     let mut start_times: HashMap<String, u64> = HashMap::new();
@@ -332,8 +346,13 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
 
         let (mut sessions, mut resumed_projects) =
             scan_lock_files(&sys, &waiting_since, &mut start_times, &mut resume_votes);
-        let (process_sessions, process_resumed_projects) =
-            scan_processes(&sys, &waiting_since, &mut start_times, &sessions, &mut resume_votes);
+        let (process_sessions, process_resumed_projects) = scan_processes(
+            &sys,
+            &waiting_since,
+            &mut start_times,
+            &sessions,
+            &mut resume_votes,
+        );
         sessions.extend(process_sessions);
         resumed_projects.extend(process_resumed_projects);
 
@@ -351,7 +370,9 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
         for (cwd, waiting) in waiting_since.iter() {
             if !seen_projects.contains(cwd) {
                 let lock_file = format!("webhook_{}", cwd);
-                let _seen_since = *start_times.entry(lock_file.clone()).or_insert_with(now_secs);
+                let _seen_since = *start_times
+                    .entry(lock_file.clone())
+                    .or_insert_with(now_secs);
                 sessions.push(AgentSession {
                     pid: 0,
                     project_name: project_name(cwd),

@@ -1,11 +1,11 @@
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tauri::{
-    AppHandle, Manager, State,
     image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    AppHandle, Manager, State,
 };
+use tokio::sync::Mutex;
 
 mod focus;
 mod hooks;
@@ -18,9 +18,7 @@ use types::{AgentSession, AppState};
 
 /// Returns the current list of agent sessions (called on dashboard init).
 #[tauri::command]
-async fn get_sessions(
-    state: State<'_, Arc<Mutex<AppState>>>,
-) -> Result<Vec<AgentSession>, String> {
+async fn get_sessions(state: State<'_, Arc<Mutex<AppState>>>) -> Result<Vec<AgentSession>, String> {
     let s = state.lock().await;
     Ok(s.sessions.clone())
 }
@@ -67,7 +65,7 @@ struct AppConfig {
 #[tauri::command]
 async fn get_config() -> AppConfig {
     let config_dir = dirs::config_dir().unwrap_or_default().join("synapsehub");
-    
+
     let token = std::fs::read_to_string(config_dir.join("hook_token"))
         .ok()
         .map(|value| value.trim().to_owned())
@@ -81,14 +79,13 @@ async fn get_config() -> AppConfig {
 // ─── Tray setup ────────────────────────────────────────────────────────────────
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let show   = MenuItem::with_id(app, "show",   "Ouvrir SynapseHub", true, None::<&str>)?;
-    let quit   = MenuItem::with_id(app, "quit",   "Quitter",           true, None::<&str>)?;
-    let menu   = Menu::with_items(app, &[&show, &quit])?;
+    let show = MenuItem::with_id(app, "show", "Ouvrir SynapseHub", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &quit])?;
 
     TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().cloned().unwrap_or_else(|| {
-            Image::from_bytes(include_bytes!("../icons/tray.png"))
-                .expect("Missing tray icon")
+            Image::from_bytes(include_bytes!("../icons/tray.png")).expect("Missing tray icon")
         }))
         .tooltip("SynapseHub")
         .menu(&menu)
@@ -106,7 +103,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => toggle_dashboard(app),
             "quit" => app.exit(0),
-            _      => {}
+            _ => {}
         })
         .build(app)?;
 
