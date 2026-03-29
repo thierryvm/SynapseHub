@@ -11,6 +11,9 @@ use sysinfo::{Pid, System};
 
 use crate::types::{AgentSession, AgentStatus, AppState, LockFile, WaitingState};
 
+const RESUME_CPU_THRESHOLD: f32 = 2.0;
+const RESUME_POLLS_REQUIRED: u8 = 2;
+
 /// Returns the current time as seconds since Unix epoch.
 fn now_secs() -> u64 {
     SystemTime::now()
@@ -28,7 +31,9 @@ fn is_pid_alive(sys: &System, pid: u32) -> bool {
 /// to consider it resumed.
 fn should_resume(waiting: &WaitingState, pid: u32, cpu_usage: f32, active_polls: u8) -> bool {
     match waiting.pid {
-        Some(waiting_pid) if waiting_pid == pid => cpu_usage >= 2.0 && active_polls >= 2,
+        Some(waiting_pid) if waiting_pid == pid => {
+            cpu_usage >= RESUME_CPU_THRESHOLD && active_polls >= RESUME_POLLS_REQUIRED
+        }
         _ => false,
     }
 }
@@ -109,7 +114,7 @@ fn scan_lock_files(
                 .process(Pid::from_u32(lock.pid))
                 .map(|p| p.cpu_usage())
                 .unwrap_or(0.0);
-            let active_polls = if waiting.pid == Some(lock.pid) && cpu_usage >= 2.0 {
+            let active_polls = if waiting.pid == Some(lock.pid) && cpu_usage >= RESUME_CPU_THRESHOLD {
                 let votes = resume_votes.entry(project_path.clone()).or_insert(0);
                 *votes = votes.saturating_add(1);
                 *votes
@@ -251,7 +256,8 @@ fn scan_processes(
             .or_insert_with(now_secs);
 
         let status = if let Some(waiting) = waiting_since.get(&cwd) {
-            let active_polls = if waiting.pid == Some(pid.as_u32()) && process.cpu_usage() >= 2.0 {
+            let active_polls =
+                if waiting.pid == Some(pid.as_u32()) && process.cpu_usage() >= RESUME_CPU_THRESHOLD {
                 let votes = resume_votes.entry(cwd.clone()).or_insert(0);
                 *votes = votes.saturating_add(1);
                 *votes
@@ -378,5 +384,90 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
         }
 
         tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{should_resume, RESUME_CPU_THRESHOLD, RESUME_POLLS_REQUIRED};
+    use crate::types::WaitingState;
+
+    fn waiting_state(pid: Option<u32>) -> WaitingState {
+        WaitingState {
+            since_secs: 1_700_000_000,
+            pid,
+        }
+    }
+
+    #[test]
+    fn should_not_resume_without_hook_pid() {
+        let waiting = waiting_state(None);
+
+        assert!(!should_resume(
+            &waiting,
+            4242,
+            RESUME_CPU_THRESHOLD + 1.0,
+            RESUME_POLLS_REQUIRED
+        ));
+    }
+
+    #[test]
+    fn should_not_resume_with_wrong_pid() {
+        let waiting = waiting_state(Some(1111));
+
+        assert!(!should_resume(
+            &waiting,
+            2222,
+            RESUME_CPU_THRESHOLD + 1.0,
+            RESUME_POLLS_REQUIRED
+        ));
+    }
+
+    #[test]
+    fn should_not_resume_with_low_cpu() {
+        let waiting = waiting_state(Some(4242));
+
+        assert!(!should_resume(
+            &waiting,
+            4242,
+            RESUME_CPU_THRESHOLD - 0.1,
+            RESUME_POLLS_REQUIRED
+        ));
+    }
+
+    #[test]
+    fn should_not_resume_after_single_active_poll() {
+        let waiting = waiting_state(Some(4242));
+
+        assert!(!should_resume(
+            &waiting,
+            4242,
+            RESUME_CPU_THRESHOLD + 1.0,
+            RESUME_POLLS_REQUIRED - 1
+        ));
+    }
+
+    #[test]
+    fn should_resume_after_two_active_polls() {
+        let waiting = waiting_state(Some(4242));
+
+        assert!(should_resume(
+            &waiting,
+            4242,
+            RESUME_CPU_THRESHOLD + 1.0,
+            RESUME_POLLS_REQUIRED
+        ));
+    }
+
+    #[test]
+    fn should_resume_after_hook_stop_when_same_pid_becomes_active_again() {
+        let waiting = waiting_state(Some(9001));
+
+        assert!(should_resume(
+            &waiting,
+            9001,
+            RESUME_CPU_THRESHOLD + 2.5,
+            RESUME_POLLS_REQUIRED
+        ));
     }
 }
