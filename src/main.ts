@@ -36,12 +36,35 @@ const projectsMeta = document.getElementById("projects-meta")!;
 const sectionCount = document.getElementById("section-count")!;
 const footerDetail = document.getElementById("footer-detail")!;
 
-function escHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function createPill(label: string, ...classNames: string[]): HTMLSpanElement {
+  const pill = document.createElement("span");
+  pill.className = ["pill", ...classNames].join(" ");
+  pill.textContent = label;
+  return pill;
+}
+
+function createFocusButton(projectLabel: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.className = "card-focus";
+  button.title = "Mettre au premier plan";
+  button.setAttribute("aria-label", `Focus ${projectLabel}`);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "13");
+  svg.setAttribute("height", "13");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M15 3h6v6M9 21H3v-6M21 3l-9 9M3 21l9-9");
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-width", "1.8");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+
+  svg.append(path);
+  button.append(svg);
+  return button;
 }
 
 function renderCard(session: AgentSession): HTMLElement {
@@ -54,42 +77,64 @@ function renderCard(session: AgentSession): HTMLElement {
   card.dataset.status = statusKey;
   card.setAttribute("aria-label", `${projectLabel} — ${getStatusLabel(session.status)}`);
 
-  card.innerHTML = `
-    <div class="card-topline">
-      <div class="card-signal">
-        <span class="status-indicator" data-status="${statusKey}" aria-hidden="true"></span>
-        <div>
-          <p class="card-project">${escHtml(projectLabel)}</p>
-          <p class="card-path">${escHtml(session.project_path)}</p>
-        </div>
-      </div>
-      <button class="card-focus" title="Mettre au premier plan" aria-label="Focus ${escHtml(projectLabel)}">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-          <path d="M15 3h6v6M9 21H3v-6M21 3l-9 9M3 21l9-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-      </button>
-    </div>
+  const topLine = document.createElement("div");
+  topLine.className = "card-topline";
 
-    <div class="card-strip">
-      <span class="pill pill--soft">${escHtml(session.ide_name)}</span>
-      ${
-        session.git_branch
-          ? `<span class="pill pill--branch">⎇ ${escHtml(session.git_branch)}</span>`
-          : `<span class="pill pill--ghost">No branch</span>`
-      }
-      <span class="pill pill--status" data-status="${statusKey}">
-        ${statusKey === "waiting" ? "Attend une reprise" : escHtml(getStatusLabel(session.status))}
-      </span>
-    </div>
+  const signal = document.createElement("div");
+  signal.className = "card-signal";
 
-    ${
-      duration
-        ? `<div class="card-footnote">Actif depuis <strong>${escHtml(duration)}</strong></div>`
-        : `<div class="card-footnote">Session détectée, sans activité en cours</div>`
-    }
-  `;
+  const indicator = document.createElement("span");
+  indicator.className = "status-indicator";
+  indicator.dataset.status = statusKey;
+  indicator.setAttribute("aria-hidden", "true");
 
-  const focusBtn = card.querySelector<HTMLButtonElement>(".card-focus")!;
+  const textBlock = document.createElement("div");
+
+  const project = document.createElement("p");
+  project.className = "card-project";
+  project.textContent = projectLabel;
+
+  const path = document.createElement("p");
+  path.className = "card-path";
+  path.textContent = session.project_path;
+
+  textBlock.append(project, path);
+  signal.append(indicator, textBlock);
+
+  const focusBtn = createFocusButton(projectLabel);
+  topLine.append(signal, focusBtn);
+
+  const strip = document.createElement("div");
+  strip.className = "card-strip";
+  strip.append(createPill(session.ide_name, "pill--soft"));
+
+  if (session.git_branch) {
+    strip.append(createPill(`⎇ ${session.git_branch}`, "pill--branch"));
+  } else {
+    strip.append(createPill("No branch", "pill--ghost"));
+  }
+
+  const statusPill = createPill(
+    statusKey === "waiting" ? "Attend une reprise" : getStatusLabel(session.status),
+    "pill--status",
+  );
+  statusPill.dataset.status = statusKey;
+  strip.append(statusPill);
+
+  const footnote = document.createElement("div");
+  footnote.className = "card-footnote";
+
+  if (duration) {
+    footnote.append("Actif depuis ");
+    const strong = document.createElement("strong");
+    strong.textContent = duration;
+    footnote.append(strong);
+  } else {
+    footnote.textContent = "Session détectée, sans activité en cours";
+  }
+
+  card.append(topLine, strip, footnote);
+
   const handleFocus = (event: Event) => {
     event.stopPropagation();
 
@@ -133,7 +178,7 @@ function render(): void {
   cards.forEach((card) => card.remove());
 
   const activeSessions = sessions.filter((session) => session.status.type !== "Idle");
-  const sortedSessions = sortSessions(sessions);
+  const sortedSessions = sortSessions(activeSessions);
 
   if (activeSessions.length === 0) {
     agentBadge.textContent = "Aucun agent";
@@ -147,9 +192,7 @@ function render(): void {
   emptyState.style.display = activeSessions.length === 0 ? "" : "none";
 
   sortedSessions.forEach((session) => {
-    if (session.status.type !== "Idle") {
-      agentList.appendChild(renderCard(session));
-    }
+    agentList.appendChild(renderCard(session));
   });
 
   updateSummary();
