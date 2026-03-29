@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     ffi::OsStr,
+    path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -54,6 +55,101 @@ fn project_name(path: &str) -> String {
         .next()
         .unwrap_or(path)
         .to_owned()
+}
+
+/// Returns true when a path points to system-owned locations that do not
+/// represent a user project we should surface in the dashboard.
+fn is_system_path(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    path.is_empty()
+        || path == "/"
+        || lower.contains("program files")
+        || lower.contains("appdata")
+        || lower.contains("/usr/bin")
+        || lower.contains("/usr/lib")
+}
+
+/// Best-effort normalization that collapses files to their parent directory and
+/// upgrades nested paths to the repository root when a Git checkout is found.
+fn normalize_project_path(path: &Path) -> Option<String> {
+    let candidate = if path.is_file() { path.parent()? } else { path };
+
+    if !candidate.exists() {
+        return None;
+    }
+
+    let resolved = git2::Repository::discover(candidate)
+        .ok()
+        .and_then(|repo| repo.workdir().map(PathBuf::from))
+        .unwrap_or_else(|| candidate.to_path_buf());
+
+    let normalized = resolved.to_string_lossy().into_owned();
+    if is_system_path(&normalized) {
+        None
+    } else {
+        Some(normalized)
+    }
+}
+
+/// Extracts a plausible project directory from the process cwd and arguments.
+fn resolve_project_path(process: &sysinfo::Process) -> Option<String> {
+    if let Some(cwd) = process.cwd() {
+        if let Some(path) = normalize_project_path(cwd) {
+            return Some(path);
+        }
+    }
+
+    for arg_os in process.cmd() {
+        let arg = arg_os.to_string_lossy().trim_matches('"').to_owned();
+        if arg.is_empty() {
+            continue;
+        }
+
+        let candidate = Path::new(&arg);
+        if let Some(path) = normalize_project_path(candidate) {
+            return Some(path);
+        }
+    }
+
+    None
+}
+
+/// Maps known process names or command-line signatures to a UI-facing agent name.
+fn detect_ide_name(name_lower: &str, cmd_joined: &str) -> Option<&'static str> {
+    if cmd_joined.contains("claude-code")
+        || cmd_joined.contains("@anthropic-ai")
+        || cmd_joined.contains("claude.cmd")
+    {
+        return Some("Claude Code Terminal");
+    }
+
+    if name_lower.contains("codex")
+        || cmd_joined.contains("\\codex.exe")
+        || cmd_joined.contains("/codex")
+        || cmd_joined.contains(" openai.codex")
+    {
+        return Some("OpenAI Codex");
+    }
+
+    if name_lower.contains("antigravity") {
+        Some("Antigravity")
+    } else if name_lower.contains("cursor") {
+        Some("Cursor")
+    } else if name_lower.contains("windsurf") {
+        Some("Windsurf")
+    } else if name_lower.contains("claude.exe") || name_lower.contains("claude desktop") {
+        Some("Claude Desktop")
+    } else if name_lower.contains("code") && name_lower != "node.exe" {
+        Some("VSCode")
+    } else if name_lower.contains("aider") {
+        Some("Aider")
+    } else if name_lower.contains("cline") {
+        Some("Cline")
+    } else if name_lower.contains("openhands") {
+        Some("OpenHands")
+    } else {
+        None
+    }
 }
 
 /// Parses all lock files in `~/.claude/ide/` and returns active sessions.
@@ -172,28 +268,6 @@ fn scan_processes(
     for (pid, process) in sys.processes() {
         let name_lower = process.name().to_string_lossy().to_lowercase();
 
-        let mut ide_name = None;
-
-        // Identification de l'agent
-        if name_lower.contains("antigravity") {
-            ide_name = Some("Antigravity");
-        } else if name_lower.contains("cursor") {
-            ide_name = Some("Cursor");
-        } else if name_lower.contains("windsurf") {
-            ide_name = Some("Windsurf");
-        } else if name_lower.contains("claude.exe") || name_lower.contains("claude desktop") {
-            ide_name = Some("Claude Desktop");
-        } else if name_lower.contains("code") && name_lower != "node.exe" {
-            ide_name = Some("VSCode");
-        } else if name_lower.contains("aider") {
-            ide_name = Some("Aider");
-        } else if name_lower.contains("cline") {
-            ide_name = Some("Cline");
-        } else if name_lower.contains("openhands") {
-            ide_name = Some("OpenHands");
-        }
-
-        // Si le nom du processus est un host commun (Node, JS, bash, pwsh), on vérifie les arguments
         let cmd_joined = process
             .cmd()
             .iter()
@@ -201,60 +275,15 @@ fn scan_processes(
             .collect::<Vec<String>>()
             .join(" ");
 
-        if cmd_joined.contains("claude-code")
-            || cmd_joined.contains("@anthropic-ai")
-            || cmd_joined.contains("claude.cmd")
-        {
-            ide_name = Some("Claude Code Terminal");
-        }
-
-        let ide_name = match ide_name {
+        let ide_name = match detect_ide_name(&name_lower, &cmd_joined) {
             Some(n) => n,
             None => continue,
         };
 
-        // Determine project path from cwd or command line arguments
-        let mut cwd = process
-            .cwd()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_default();
-
-        let mut cwd_lower = cwd.to_lowercase();
-        if cwd.is_empty()
-            || cwd_lower.contains("program files")
-            || cwd_lower.contains("appdata")
-            || cwd_lower.contains("/usr/bin")
-            || cwd_lower.contains("/usr/lib")
-            || cwd == "/"
-        {
-            // Cherche dans les arguments command-line une éventuelle arborescence de projet existante
-            for arg_os in process.cmd() {
-                let arg_str = arg_os.to_string_lossy().into_owned();
-                let path = std::path::Path::new(&arg_str);
-                if path.is_dir() {
-                    let arg_lower = arg_str.to_lowercase();
-                    if !arg_lower.contains("program files")
-                        && !arg_lower.contains("appdata")
-                        && arg_str != "/"
-                    {
-                        cwd = arg_str;
-                        break;
-                    }
-                }
-            }
-            cwd_lower = cwd.to_lowercase();
-        }
-
-        // Ignore system paths or typical non-project folders
-        if cwd_lower.contains("program files")
-            || cwd_lower.contains("appdata")
-            || cwd_lower.contains("/usr/bin")
-            || cwd_lower.contains("/usr/lib")
-            || cwd == "/"
-            || cwd.is_empty()
-        {
-            continue;
-        }
+        let cwd = match resolve_project_path(process) {
+            Some(path) => path,
+            None => continue,
+        };
 
         // Avoid duplicating sessions for the same project
         if seen_projects.contains(&cwd) {
@@ -410,7 +439,9 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{should_resume, RESUME_CPU_THRESHOLD, RESUME_POLLS_REQUIRED};
+    use super::{
+        detect_ide_name, is_system_path, should_resume, RESUME_CPU_THRESHOLD, RESUME_POLLS_REQUIRED,
+    };
     use crate::types::WaitingState;
 
     fn waiting_state(pid: Option<u32>) -> WaitingState {
@@ -490,5 +521,31 @@ mod tests {
             RESUME_CPU_THRESHOLD + 2.5,
             RESUME_POLLS_REQUIRED
         ));
+    }
+
+    #[test]
+    fn detects_codex_processes_before_generic_vscode_matching() {
+        assert_eq!(
+            detect_ide_name("codex.exe", "\"C:\\\\Tools\\\\codex.exe\" app-server"),
+            Some("OpenAI Codex")
+        );
+    }
+
+    #[test]
+    fn detects_claude_code_from_command_line_signature() {
+        assert_eq!(
+            detect_ide_name(
+                "node.exe",
+                "node claude-code --project F:\\\\PROJECTS\\\\Apps\\\\SynapseHub"
+            ),
+            Some("Claude Code Terminal")
+        );
+    }
+
+    #[test]
+    fn flags_system_locations_as_non_project_paths() {
+        assert!(is_system_path("C:\\Program Files\\Codex"));
+        assert!(is_system_path("C:\\Users\\thier\\AppData\\Local\\Programs"));
+        assert!(!is_system_path("F:\\PROJECTS\\Apps\\SynapseHub"));
     }
 }

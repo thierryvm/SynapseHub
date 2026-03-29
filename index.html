@@ -28,23 +28,23 @@
             </svg>
             <div class="brand-copy">
               <span class="logo-text">SynapseHub</span>
-              <span class="logo-subtext">Agent operations desk</span>
+              <span class="logo-subtext">Centre de pilotage IA</span>
             </div>
           </div>
           <div class="header-meta">
             <span class="agent-badge" id="agent-badge">—</span>
-            <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Settings">
+            <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Paramètres">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
               </svg>
             </button>
-            <button class="icon-btn" id="btn-minimize" title="Réduire" aria-label="Minimize">
+            <button class="icon-btn" id="btn-minimize" title="Réduire" aria-label="Réduire">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
               </svg>
             </button>
-            <button class="icon-btn" id="btn-close" title="Fermer" aria-label="Close">
+            <button class="icon-btn" id="btn-close" title="Fermer" aria-label="Fermer">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
               </svg>
@@ -55,7 +55,7 @@
         <div class="dashboard-scroll">
           <section class="hero-panel">
             <div class="hero-copy">
-              <p class="hero-kicker" id="hero-kicker">Monitoring local</p>
+              <p class="hero-kicker" id="hero-kicker">Surveillance locale</p>
               <h1 class="hero-title" id="hero-title">Prêt à suivre vos agents</h1>
               <p class="hero-subtitle" id="hero-subtitle">
                 SynapseHub surveille vos sessions Claude Code, Cursor et Antigravity en temps réel.
@@ -88,7 +88,7 @@
 
           <section class="section-heading">
             <div>
-              <p class="section-kicker">Live feed</p>
+              <p class="section-kicker">Flux live</p>
               <h2 class="section-title">Sessions détectées</h2>
             </div>
             <span class="section-count" id="section-count">0 actives</span>
@@ -116,7 +116,7 @@
               <div class="footer-subtext" id="footer-detail">Aucun agent critique</div>
             </div>
           </div>
-          <span class="version-label">v0.1.0</span>
+          <span class="version-label" id="version-label">v0.1.0</span>
         </footer>
       </div>
 
@@ -125,20 +125,20 @@
           <div class="sheet-drag-handle"></div>
           <div class="modal-header">
             <div>
-              <p class="section-kicker">Setup</p>
+              <p class="section-kicker">Configuration</p>
               <h2>Guide & Paramètres</h2>
             </div>
-            <button class="icon-btn" id="btn-close-settings" title="Fermer" aria-label="Close Settings">
+            <button class="icon-btn" id="btn-close-settings" title="Fermer" aria-label="Fermer les paramètres">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
               </svg>
             </button>
           </div>
 
-          <div class="modal-body">
-            <div class="guide-grid">
-              <section class="guide-card">
-                <p class="guide-index">01</p>
+            <div class="modal-body">
+              <div class="guide-grid">
+                <section class="guide-card">
+                  <p class="guide-index">01</p>
                 <h3>Détection instantanée</h3>
                 <p class="modal-text">
                   Cursor, Windsurf, Antigravity et VS Code sont détectés automatiquement dès qu’un projet est ouvert.
@@ -152,6 +152,24 @@
                 </p>
               </section>
             </div>
+
+            <section class="update-card" aria-labelledby="update-title">
+              <div class="update-copy">
+                <p class="guide-index">03</p>
+                <h3 id="update-title">Mises à jour continues</h3>
+                <p class="modal-text" id="update-summary">
+                  SynapseHub vérifie les nouvelles versions en arrière-plan et peut les installer sans réinstallation manuelle.
+                </p>
+                <p class="update-meta" id="update-meta">
+                  Une release GitHub signée et publiée suffit ensuite pour distribuer la prochaine version.
+                </p>
+              </div>
+              <div class="update-actions">
+                <button class="btn-secondary" id="btn-check-updates">Rechercher</button>
+                <button class="btn-primary" id="btn-install-update" style="display: none;">Installer</button>
+              </div>
+              <span class="modal-status update-progress" id="update-progress" role="status" aria-live="polite"></span>
+            </section>
 
             <div class="code-block-wrapper">
               <div class="code-block-header">
