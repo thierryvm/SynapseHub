@@ -114,28 +114,190 @@ fn scan_lock_files(
         });
     }
 
-    // Clean up start_times entries for gone sessions
-    let active_locks: std::collections::HashSet<_> =
-        sessions.iter().map(|s| s.lock_file.clone()).collect();
-    start_times.retain(|k, _| active_locks.contains(k));
+    sessions
+}
+
+/// Scans active processes for known AI agents to provide universal tracking.
+fn scan_processes(
+    sys: &System,
+    waiting_since: &HashMap<String, u64>,
+    start_times: &mut HashMap<String, u64>,
+    existing_sessions: &[AgentSession],
+) -> Vec<AgentSession> {
+    let mut sessions = vec![];
+    let mut seen_projects = std::collections::HashSet::new();
+
+    // Preremplir avec les projets déjà trouvés par scan_lock_files
+    for s in existing_sessions {
+        seen_projects.insert(s.project_path.clone());
+    }
+
+    for (pid, process) in sys.processes() {
+        let name_lower = process.name().to_string_lossy().to_lowercase();
+        
+        let mut ide_name = None;
+
+        // Identification de l'agent
+        if name_lower.contains("antigravity") {
+            ide_name = Some("Antigravity");
+        } else if name_lower.contains("cursor") {
+            ide_name = Some("Cursor");
+        } else if name_lower.contains("windsurf") {
+            ide_name = Some("Windsurf");
+        } else if name_lower.contains("claude.exe") || name_lower.contains("claude desktop") {
+            ide_name = Some("Claude Desktop");
+        } else if name_lower.contains("code") && name_lower != "node.exe" {
+            ide_name = Some("VSCode");
+        } else if name_lower.contains("aider") {
+            ide_name = Some("Aider");
+        } else if name_lower.contains("cline") {
+            ide_name = Some("Cline");
+        } else if name_lower.contains("openhands") {
+            ide_name = Some("OpenHands");
+        }
+
+        // Si le nom du processus est un host commun (Node, JS, bash, pwsh), on vérifie les arguments
+        let cmd_joined = process.cmd().iter()
+            .map(|arg| arg.to_string_lossy().to_lowercase())
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        if cmd_joined.contains("claude-code") || cmd_joined.contains("@anthropic-ai") || cmd_joined.contains("claude.cmd") {
+            ide_name = Some("Claude Code Terminal");
+        }
+
+        let ide_name = match ide_name {
+            Some(n) => n,
+            None => continue,
+        };
+
+        // Determine project path from cwd or command line arguments
+        let mut cwd = process.cwd().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+        
+        let mut cwd_lower = cwd.to_lowercase();
+        if cwd.is_empty() || cwd_lower.contains("program files") || cwd_lower.contains("appdata") || cwd_lower.contains("/usr/bin") || cwd_lower.contains("/usr/lib") || cwd == "/" {
+            // Cherche dans les arguments command-line une éventuelle arborescence de projet existante
+            for arg_os in process.cmd() {
+                let arg_str = arg_os.to_string_lossy().into_owned();
+                let path = std::path::Path::new(&arg_str);
+                if path.is_dir() {
+                    let arg_lower = arg_str.to_lowercase();
+                    if !arg_lower.contains("program files") && !arg_lower.contains("appdata") && arg_str != "/" {
+                        cwd = arg_str;
+                        break;
+                    }
+                }
+            }
+            cwd_lower = cwd.to_lowercase();
+        }
+
+        // Ignore system paths or typical non-project folders
+        if cwd_lower.contains("program files") 
+            || cwd_lower.contains("appdata") 
+            || cwd_lower.contains("/usr/bin")
+            || cwd_lower.contains("/usr/lib")
+            || cwd == "/" 
+            || cwd.is_empty() 
+        {
+            continue;
+        }
+
+        // Avoid duplicating sessions for the same project
+        if seen_projects.contains(&cwd) {
+            continue;
+        }
+        seen_projects.insert(cwd.clone());
+
+        // Use a stable identifier to track uptime
+        let lock_file = format!("process_{}", cwd);
+
+        let seen_since = *start_times
+            .entry(lock_file.clone())
+            .or_insert_with(now_secs);
+
+        let status = if let Some(&ws) = waiting_since.get(&cwd) {
+            AgentStatus::Waiting {
+                since_secs: now_secs().saturating_sub(ws),
+            }
+        } else {
+            AgentStatus::Running {
+                since_secs: now_secs().saturating_sub(seen_since),
+            }
+        };
+
+        sessions.push(AgentSession {
+            pid: pid.as_u32(),
+            project_name: project_name(&cwd),
+            project_path: cwd.clone(),
+            ide_name: ide_name.to_owned(),
+            git_branch: git_branch(&cwd),
+            status,
+            lock_file,
+        });
+    }
 
     sessions
 }
 
 /// Background task: polls lock files every 2 s and emits `agents-updated`.
 pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
-    let mut sys = System::new_all();
+    use sysinfo::{RefreshKind, ProcessRefreshKind, UpdateKind};
+    
+    // Optimisation majeure du CPU : on informe sysinfo de ne scanner que le strict nécessaire
+    let refresh_kind = RefreshKind::nothing().with_processes(
+        ProcessRefreshKind::nothing()
+            .with_exe(UpdateKind::OnlyIfNotSet)
+            .with_cmd(UpdateKind::OnlyIfNotSet)
+            // On ne demande ni la RAM ni le CPU de chaque process, ce qui est très lourd
+    );
+    let mut sys = System::new_with_specifics(refresh_kind);
     let mut start_times: HashMap<String, u64> = HashMap::new();
 
     loop {
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        // Refresh uniquement ce qui est nécessaire très rapidement
+        sys.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::nothing()
+                .with_exe(UpdateKind::OnlyIfNotSet)
+                .with_cmd(UpdateKind::OnlyIfNotSet),
+        );
 
         let waiting_since = {
             let s = state.lock().await;
             s.waiting_since.clone()
         };
 
-        let sessions = scan_lock_files(&sys, &waiting_since, &mut start_times);
+        let mut sessions = scan_lock_files(&sys, &waiting_since, &mut start_times);
+        let process_sessions = scan_processes(&sys, &waiting_since, &mut start_times, &sessions);
+        sessions.extend(process_sessions);
+
+        // Webhook fallback : Support universel pour les agents inconnus qui pingent le webhook
+        let seen_projects: std::collections::HashSet<_> =
+            sessions.iter().map(|s| s.project_path.clone()).collect();
+
+        for (cwd, ws) in waiting_since.iter() {
+            if !seen_projects.contains(cwd) {
+                let lock_file = format!("webhook_{}", cwd);
+                let _seen_since = *start_times.entry(lock_file.clone()).or_insert_with(now_secs);
+                sessions.push(AgentSession {
+                    pid: 0,
+                    project_name: project_name(cwd),
+                    project_path: cwd.clone(),
+                    ide_name: "Agent IA Ext.".to_string(),
+                    git_branch: git_branch(cwd),
+                    status: AgentStatus::Waiting {
+                        since_secs: now_secs().saturating_sub(*ws),
+                    },
+                    lock_file,
+                });
+            }
+        }
+
+        // Nettoyage global des start_times morts
+        let active_locks: std::collections::HashSet<_> =
+            sessions.iter().map(|s| s.lock_file.clone()).collect();
+        start_times.retain(|k, _| active_locks.contains(k));
 
         {
             let mut s = state.lock().await;

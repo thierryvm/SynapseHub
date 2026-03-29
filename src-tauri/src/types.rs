@@ -7,8 +7,11 @@ pub struct LockFile {
     pub pid: u32,
     pub workspace_folders: Vec<String>,
     pub ide_name: String,
+    #[allow(dead_code)]
     pub transport: String,
+    #[allow(dead_code)]
     pub running_in_windows: Option<bool>,
+    #[allow(dead_code)]
     pub auth_token: String,
 }
 
@@ -45,7 +48,11 @@ pub struct HookPayload {
     /// Absolute path of the project workspace.
     pub project_dir: String,
     /// PID of the Claude Code process (optional, aids matching).
+    #[allow(dead_code)]
     pub pid: Option<u32>,
+    /// Nom optionnel de l'agent (ex: "Aider", "Cursor")
+    #[allow(dead_code)]
+    pub agent_name: Option<String>,
 }
 
 /// Global mutable app state shared across threads.

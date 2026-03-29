@@ -45,11 +45,22 @@ fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
-/// Placeholder for the settings window (Phase 2).
+#[derive(serde::Serialize)]
+struct AppConfig {
+    port: Option<u16>,
+    token: Option<String>,
+}
+
+/// Fetches the dynamic hook port and secret token
 #[tauri::command]
-async fn open_settings(app: AppHandle) {
-    log::info!("open_settings invoked (not yet implemented)");
-    let _ = app;
+async fn get_config() -> AppConfig {
+    let config_dir = dirs::config_dir().unwrap_or_default().join("synapsehub");
+    
+    let token = std::fs::read_to_string(config_dir.join("hook_token")).ok();
+    let port_str = std::fs::read_to_string(config_dir.join("hook_port")).ok();
+    let port = port_str.and_then(|s| s.trim().parse::<u16>().ok());
+
+    AppConfig { port, token }
 }
 
 // ─── Tray setup ────────────────────────────────────────────────────────────────
@@ -92,27 +103,9 @@ fn toggle_dashboard(app: &AppHandle) {
         if win.is_visible().unwrap_or(false) {
             let _ = win.hide();
         } else {
-            position_near_tray(&win);
+            let _ = win.center();
             let _ = win.show();
             let _ = win.set_focus();
-        }
-    }
-}
-
-/// Positions the dashboard window near the system tray (bottom-right area).
-fn position_near_tray(win: &tauri::WebviewWindow) {
-    if let (Ok(monitor), Ok(size)) = (win.primary_monitor(), win.outer_size()) {
-        if let Some(m) = monitor {
-            let screen = m.size();
-            let scale  = m.scale_factor();
-            let w = size.width;
-            let h = size.height;
-            let x = (screen.width  as f64 / scale) as i32 - w as i32 - 16;
-            let y = (screen.height as f64 / scale) as i32 - h as i32 - 56;
-            let _ = win.set_position(tauri::PhysicalPosition::new(
-                (x as f64 * scale) as i32,
-                (y as f64 * scale) as i32,
-            ));
         }
     }
 }
@@ -188,7 +181,7 @@ pub fn run() {
             focus_window,
             hide_window,
             quit_app,
-            open_settings,
+            get_config,
         ])
         .run(tauri::generate_context!())
         .expect("Error running SynapseHub");
