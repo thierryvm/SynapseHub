@@ -16,7 +16,7 @@
 //! ```
 //!
 //! Or, using curl directly (no helper binary needed):
-//! ```
+//! ```bash
 //! curl -s -X POST http://127.0.0.1:PORT/hook \
 //!   -H "Content-Type: application/json" \
 //!   -d "{\"token\":\"TOKEN\",\"project_dir\":\"$CLAUDE_PROJECT_DIR\",\"pid\":$PPID}"
@@ -38,7 +38,7 @@ use tokio::sync::Mutex;
 use tauri::AppHandle;
 use tauri::Emitter;
 
-use crate::types::{AppState, HookPayload};
+use crate::types::{AppState, HookPayload, WaitingState};
 
 #[derive(Clone)]
 struct HookState {
@@ -67,7 +67,13 @@ async fn handle_hook(
         let mut state = hs.app_state.lock().await;
         state
             .waiting_since
-            .insert(payload.project_dir.clone(), now);
+            .insert(
+                payload.project_dir.clone(),
+                WaitingState {
+                    since_secs: now,
+                    pid: payload.pid,
+                },
+            );
     }
 
     // Notify the tray icon and dashboard

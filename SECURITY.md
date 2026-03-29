@@ -39,6 +39,7 @@ Out of scope:
 
 - The local HTTP hook server binds to `127.0.0.1` only and uses a randomly generated token stored locally.
 - No credentials or secrets are ever transmitted to remote servers.
-- The token file (`config/hook_token`) is excluded from version control via `.gitignore`.
+- Hook secrets are stored in the operating system config directory (`%APPDATA%\synapsehub\` on Windows, `~/.config/synapsehub/` on macOS/Linux), not inside the repository.
+- Hook secrets must never be logged, copied into issue reports, or committed to version control.
 
 Thank you for helping keep SynapseHub secure.
