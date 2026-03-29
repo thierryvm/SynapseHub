@@ -31,6 +31,18 @@ fn focus_window(pid: u32) {
     focus::focus_window_by_pid(pid);
 }
 
+/// Clears the waiting marker once the user explicitly returns to the agent.
+/// This keeps the Rust/JS bridge simple and avoids refactoring the scanner path.
+#[tauri::command]
+async fn acknowledge_waiting(
+    project_path: String,
+    state: State<'_, Arc<Mutex<AppState>>>,
+) -> Result<(), String> {
+    let mut app_state = state.lock().await;
+    app_state.waiting_since.remove(&project_path);
+    Ok(())
+}
+
 /// Hides the dashboard window (minimize to tray).
 #[tauri::command]
 fn hide_window(app: AppHandle) {
@@ -179,6 +191,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_sessions,
             focus_window,
+            acknowledge_waiting,
             hide_window,
             quit_app,
             get_config,
