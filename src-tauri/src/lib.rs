@@ -56,7 +56,10 @@ struct AppConfig {
 async fn get_config() -> AppConfig {
     let config_dir = dirs::config_dir().unwrap_or_default().join("synapsehub");
     
-    let token = std::fs::read_to_string(config_dir.join("hook_token")).ok();
+    let token = std::fs::read_to_string(config_dir.join("hook_token"))
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty());
     let port_str = std::fs::read_to_string(config_dir.join("hook_port")).ok();
     let port = port_str.and_then(|s| s.trim().parse::<u16>().ok());
 
@@ -155,8 +158,7 @@ pub fn run() {
             let handle = app.handle().clone();
             let secret = load_or_create_secret();
 
-            log::info!("Hook token loaded — configure Claude Code hooks with this token.");
-            log::info!("Hook token: {secret}");
+            log::info!("Hook token loaded — configure Claude Code hooks from the settings panel.");
 
             // Start the background watcher and hook server
             tauri::async_runtime::spawn(watcher::start_watcher(state.clone(), handle.clone()));
