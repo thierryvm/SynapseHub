@@ -9,7 +9,7 @@ use tauri::AppHandle;
 use tauri::Emitter;
 use sysinfo::{Pid, System};
 
-use crate::types::{AgentSession, AgentStatus, AppState, LockFile};
+use crate::types::{AgentSession, AgentStatus, AppState, LockFile, WaitingState};
 
 /// Returns the current time as seconds since Unix epoch.
 fn now_secs() -> u64 {
@@ -22,6 +22,29 @@ fn now_secs() -> u64 {
 /// Checks whether a process with the given PID is still alive.
 fn is_pid_alive(sys: &System, pid: u32) -> bool {
     sys.process(Pid::from_u32(pid)).is_some()
+}
+
+/// Best-effort last modification time for a file as seconds since epoch.
+fn file_modified_secs(path: &std::path::Path) -> Option<u64> {
+    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
+    let secs = modified.duration_since(UNIX_EPOCH).ok()?.as_secs();
+    Some(secs)
+}
+
+/// Returns true when a waiting session shows enough local activity to consider it resumed.
+fn should_resume(waiting: &WaitingState, pid: u32, cpu_usage: f32, activity_marker_secs: Option<u64>) -> bool {
+    let same_pid = waiting.pid.is_none() || waiting.pid == Some(pid);
+    if !same_pid {
+        return false;
+    }
+
+    if let Some(marker_secs) = activity_marker_secs {
+        if marker_secs > waiting.since_secs {
+            return true;
+        }
+    }
+
+    cpu_usage >= 1.0
 }
 
 /// Reads the current git branch for a directory (best-effort).
@@ -45,20 +68,21 @@ fn project_name(path: &str) -> String {
 /// Parses all lock files in `~/.claude/ide/` and returns active sessions.
 fn scan_lock_files(
     sys: &System,
-    waiting_since: &HashMap<String, u64>,
+    waiting_since: &HashMap<String, WaitingState>,
     start_times: &mut HashMap<String, u64>,
-) -> Vec<AgentSession> {
+) -> (Vec<AgentSession>, Vec<String>) {
     let lock_dir = match dirs::home_dir() {
         Some(h) => h.join(".claude").join("ide"),
-        None => return vec![],
+        None => return (vec![], vec![]),
     };
 
     let entries = match std::fs::read_dir(&lock_dir) {
         Ok(e) => e,
-        Err(_) => return vec![],
+        Err(_) => return (vec![], vec![]),
     };
 
     let mut sessions = vec![];
+    let mut resumed_projects = vec![];
 
     for entry in entries.flatten() {
         let path = entry.path();
@@ -93,9 +117,18 @@ fn scan_lock_files(
             .entry(lock_file.clone())
             .or_insert_with(now_secs);
 
-        let status = if let Some(&ws) = waiting_since.get(&project_path) {
-            AgentStatus::Waiting {
-                since_secs: now_secs().saturating_sub(ws),
+        let status = if let Some(waiting) = waiting_since.get(&project_path) {
+            let modified_secs = file_modified_secs(&path);
+
+            if should_resume(waiting, lock.pid, sys.process(Pid::from_u32(lock.pid)).map(|p| p.cpu_usage()).unwrap_or(0.0), modified_secs) {
+                resumed_projects.push(project_path.clone());
+                AgentStatus::Running {
+                    since_secs: now_secs().saturating_sub(seen_since),
+                }
+            } else {
+                AgentStatus::Waiting {
+                    since_secs: now_secs().saturating_sub(waiting.since_secs),
+                }
             }
         } else {
             AgentStatus::Running {
@@ -114,17 +147,18 @@ fn scan_lock_files(
         });
     }
 
-    sessions
+    (sessions, resumed_projects)
 }
 
 /// Scans active processes for known AI agents to provide universal tracking.
 fn scan_processes(
     sys: &System,
-    waiting_since: &HashMap<String, u64>,
+    waiting_since: &HashMap<String, WaitingState>,
     start_times: &mut HashMap<String, u64>,
     existing_sessions: &[AgentSession],
-) -> Vec<AgentSession> {
+) -> (Vec<AgentSession>, Vec<String>) {
     let mut sessions = vec![];
+    let mut resumed_projects = vec![];
     let mut seen_projects = std::collections::HashSet::new();
 
     // Preremplir avec les projets déjà trouvés par scan_lock_files
@@ -215,9 +249,16 @@ fn scan_processes(
             .entry(lock_file.clone())
             .or_insert_with(now_secs);
 
-        let status = if let Some(&ws) = waiting_since.get(&cwd) {
-            AgentStatus::Waiting {
-                since_secs: now_secs().saturating_sub(ws),
+        let status = if let Some(waiting) = waiting_since.get(&cwd) {
+            if should_resume(waiting, pid.as_u32(), process.cpu_usage(), None) {
+                resumed_projects.push(cwd.clone());
+                AgentStatus::Running {
+                    since_secs: now_secs().saturating_sub(seen_since),
+                }
+            } else {
+                AgentStatus::Waiting {
+                    since_secs: now_secs().saturating_sub(waiting.since_secs),
+                }
             }
         } else {
             AgentStatus::Running {
@@ -236,7 +277,7 @@ fn scan_processes(
         });
     }
 
-    sessions
+    (sessions, resumed_projects)
 }
 
 /// Background task: polls lock files every 2 s and emits `agents-updated`.
@@ -246,6 +287,7 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
     // Optimisation majeure du CPU : on informe sysinfo de ne scanner que le strict nécessaire
     let refresh_kind = RefreshKind::nothing().with_processes(
         ProcessRefreshKind::nothing()
+            .with_cpu()
             .with_exe(UpdateKind::OnlyIfNotSet)
             .with_cmd(UpdateKind::OnlyIfNotSet)
             // On ne demande ni la RAM ni le CPU de chaque process, ce qui est très lourd
@@ -259,6 +301,7 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
             sysinfo::ProcessesToUpdate::All,
             true,
             ProcessRefreshKind::nothing()
+                .with_cpu()
                 .with_exe(UpdateKind::OnlyIfNotSet)
                 .with_cmd(UpdateKind::OnlyIfNotSet),
         );
@@ -268,15 +311,24 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
             s.waiting_since.clone()
         };
 
-        let mut sessions = scan_lock_files(&sys, &waiting_since, &mut start_times);
-        let process_sessions = scan_processes(&sys, &waiting_since, &mut start_times, &sessions);
+        let (mut sessions, mut resumed_projects) = scan_lock_files(&sys, &waiting_since, &mut start_times);
+        let (process_sessions, process_resumed_projects) =
+            scan_processes(&sys, &waiting_since, &mut start_times, &sessions);
         sessions.extend(process_sessions);
+        resumed_projects.extend(process_resumed_projects);
+
+        if !resumed_projects.is_empty() {
+            let mut state = state.lock().await;
+            for project_path in resumed_projects {
+                state.waiting_since.remove(&project_path);
+            }
+        }
 
         // Webhook fallback : Support universel pour les agents inconnus qui pingent le webhook
         let seen_projects: std::collections::HashSet<_> =
             sessions.iter().map(|s| s.project_path.clone()).collect();
 
-        for (cwd, ws) in waiting_since.iter() {
+        for (cwd, waiting) in waiting_since.iter() {
             if !seen_projects.contains(cwd) {
                 let lock_file = format!("webhook_{}", cwd);
                 let _seen_since = *start_times.entry(lock_file.clone()).or_insert_with(now_secs);
@@ -287,7 +339,7 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
                     ide_name: "Agent IA Ext.".to_string(),
                     git_branch: git_branch(cwd),
                     status: AgentStatus::Waiting {
-                        since_secs: now_secs().saturating_sub(*ws),
+                        since_secs: now_secs().saturating_sub(waiting.since_secs),
                     },
                     lock_file,
                 });
