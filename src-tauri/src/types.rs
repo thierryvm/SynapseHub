@@ -55,11 +55,18 @@ pub struct HookPayload {
     pub agent_name: Option<String>,
 }
 
+/// Tracks a project that is currently considered waiting for user input.
+#[derive(Debug, Clone)]
+pub struct WaitingState {
+    pub since_secs: u64,
+    pub pid: Option<u32>,
+}
+
 /// Global mutable app state shared across threads.
 #[derive(Debug, Default)]
 pub struct AppState {
     pub sessions: Vec<AgentSession>,
-    /// Tokens for projects currently in "waiting" state.
-    /// Key: project_path, Value: timestamp (secs since epoch).
-    pub waiting_since: std::collections::HashMap<String, u64>,
+    /// Projects currently in "waiting" state.
+    /// Key: project_path, Value: waiting metadata for local resume detection.
+    pub waiting_since: std::collections::HashMap<String, WaitingState>,
 }

@@ -117,6 +117,11 @@ function renderCard(session: AgentSession): HTMLElement {
   const focusBtn = card.querySelector<HTMLButtonElement>(".card-focus")!;
   const handleFocus = (e: Event) => {
     e.stopPropagation();
+
+    if (session.status.type === "Waiting") {
+      invoke("acknowledge_waiting", { projectPath: session.project_path }).catch(console.error);
+    }
+
     invoke("focus_window", { pid: session.pid }).catch(console.error);
   };
   card.addEventListener("click", handleFocus);
