@@ -91,6 +91,14 @@ fn normalize_project_path(path: &Path) -> Option<String> {
     }
 }
 
+/// Fast filter to avoid probing arbitrary command line flags as filesystem paths.
+fn looks_like_project_path_arg(arg: &str) -> bool {
+    arg.contains(":\\")
+        || arg.contains('\\')
+        || arg.contains('/')
+        || Path::new(arg).exists()
+}
+
 /// Extracts a plausible project directory from the process cwd and arguments.
 fn resolve_project_path(process: &sysinfo::Process) -> Option<String> {
     if let Some(cwd) = process.cwd() {
@@ -101,7 +109,7 @@ fn resolve_project_path(process: &sysinfo::Process) -> Option<String> {
 
     for arg_os in process.cmd() {
         let arg = arg_os.to_string_lossy().trim_matches('"').to_owned();
-        if arg.is_empty() {
+        if arg.is_empty() || !looks_like_project_path_arg(&arg) {
             continue;
         }
 
@@ -440,7 +448,8 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{
-        detect_ide_name, is_system_path, should_resume, RESUME_CPU_THRESHOLD, RESUME_POLLS_REQUIRED,
+        detect_ide_name, is_system_path, looks_like_project_path_arg, should_resume,
+        RESUME_CPU_THRESHOLD, RESUME_POLLS_REQUIRED,
     };
     use crate::types::WaitingState;
 
@@ -547,5 +556,13 @@ mod tests {
         assert!(is_system_path("C:\\Program Files\\Codex"));
         assert!(is_system_path("C:\\Users\\thier\\AppData\\Local\\Programs"));
         assert!(!is_system_path("F:\\PROJECTS\\Apps\\SynapseHub"));
+    }
+
+    #[test]
+    fn path_arg_filter_ignores_plain_flags_and_accepts_real_paths() {
+        assert!(!looks_like_project_path_arg("--port"));
+        assert!(!looks_like_project_path_arg("serve"));
+        assert!(looks_like_project_path_arg("F:\\PROJECTS\\Apps\\SynapseHub"));
+        assert!(looks_like_project_path_arg("./src"));
     }
 }

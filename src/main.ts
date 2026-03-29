@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { check, type Update } from "@tauri-apps/plugin-updater";
+import packageJson from "../package.json";
 import {
   type AgentSession,
   getStatusDuration,
@@ -47,6 +48,7 @@ let availableUpdate: Update | null = null;
 let lastUpdateCheckLabel = "Aucune vérification récente";
 let isCheckingUpdates = false;
 let isInstallingUpdate = false;
+const APP_VERSION_LABEL = `v${packageJson.version}`;
 
 function createPill(label: string, ...classNames: string[]): HTMLSpanElement {
   const pill = document.createElement("span");
@@ -110,6 +112,10 @@ function setUpdateDisplay(summary: string, meta: string, progress = ""): void {
   setUpdateControls();
 }
 
+function setVersionLabel(suffix?: string): void {
+  versionLabel.textContent = suffix ? `${APP_VERSION_LABEL} · ${suffix}` : APP_VERSION_LABEL;
+}
+
 async function checkForUpdates(userInitiated: boolean): Promise<void> {
   if (isCheckingUpdates || isInstallingUpdate) {
     return;
@@ -130,23 +136,30 @@ async function checkForUpdates(userInitiated: boolean): Promise<void> {
     })}`;
 
     if (update) {
-      versionLabel.textContent = "v0.1.0 · update prête";
+      setVersionLabel("update prête");
       setUpdateDisplay(
         `Version ${update.version} disponible`,
         update.body?.trim() || `Version actuelle ${update.currentVersion}. Installation en un clic.`,
         lastUpdateCheckLabel,
       );
     } else if (userInitiated) {
-      versionLabel.textContent = "v0.1.0";
+      setVersionLabel();
       setUpdateDisplay(
         "Application à jour",
         "Vous utilisez déjà la dernière version publiée de SynapseHub.",
         lastUpdateCheckLabel,
       );
+    } else {
+      setVersionLabel();
+      setUpdateDisplay(
+        "Aucune mise à jour détectée",
+        "SynapseHub est déjà synchronisé avec la dernière release publiée.",
+        lastUpdateCheckLabel,
+      );
     }
   } catch (error) {
     availableUpdate = null;
-    versionLabel.textContent = "v0.1.0";
+    setVersionLabel();
     setUpdateDisplay(
       "Vérification indisponible",
       "La mise à jour n’a pas pu être vérifiée. Vérifiez qu’une release GitHub publiée existe.",
@@ -182,25 +195,29 @@ async function installUpdate(): Promise<void> {
 
   try {
     await availableUpdate.downloadAndInstall((event) => {
-      if (event.event === "Started") {
-        totalBytes = event.data.contentLength ?? 0;
-        updateProgress.textContent =
-          totalBytes > 0
-            ? `Téléchargement: 0 / ${formatBytes(totalBytes)}`
-            : "Téléchargement démarré";
-      } else if (event.event === "Progress") {
-        downloadedBytes += event.data.chunkLength;
-        updateProgress.textContent =
-          totalBytes > 0
-            ? `Téléchargement: ${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}`
-            : `Téléchargement: ${formatBytes(downloadedBytes)}`;
-      } else {
-        updateProgress.textContent = "Paquet reçu, installation locale en cours…";
+      switch (event.event) {
+        case "Started":
+          totalBytes = event.data.contentLength ?? 0;
+          updateProgress.textContent =
+            totalBytes > 0
+              ? `Téléchargement: 0 / ${formatBytes(totalBytes)}`
+              : "Téléchargement démarré";
+          break;
+        case "Progress":
+          downloadedBytes += event.data.chunkLength;
+          updateProgress.textContent =
+            totalBytes > 0
+              ? `Téléchargement: ${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}`
+              : `Téléchargement: ${formatBytes(downloadedBytes)}`;
+          break;
+        case "Finished":
+          updateProgress.textContent = "Paquet reçu, installation locale en cours…";
+          break;
       }
     });
 
     availableUpdate = null;
-    versionLabel.textContent = "v0.1.0 · relance conseillée";
+    setVersionLabel("relance conseillée");
     setUpdateDisplay(
       "Mise à jour installée",
       "Relancez SynapseHub si le redémarrage n’est pas automatique sur votre machine.",
