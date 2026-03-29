@@ -24,27 +24,13 @@ fn is_pid_alive(sys: &System, pid: u32) -> bool {
     sys.process(Pid::from_u32(pid)).is_some()
 }
 
-/// Best-effort last modification time for a file as seconds since epoch.
-fn file_modified_secs(path: &std::path::Path) -> Option<u64> {
-    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
-    let secs = modified.duration_since(UNIX_EPOCH).ok()?.as_secs();
-    Some(secs)
-}
-
-/// Returns true when a waiting session shows enough local activity to consider it resumed.
-fn should_resume(waiting: &WaitingState, pid: u32, cpu_usage: f32, activity_marker_secs: Option<u64>) -> bool {
-    let same_pid = waiting.pid.is_none() || waiting.pid == Some(pid);
-    if !same_pid {
-        return false;
+/// Returns true when a waiting session shows sustained enough local activity
+/// to consider it resumed.
+fn should_resume(waiting: &WaitingState, pid: u32, cpu_usage: f32, active_polls: u8) -> bool {
+    match waiting.pid {
+        Some(waiting_pid) if waiting_pid == pid => cpu_usage >= 2.0 && active_polls >= 2,
+        _ => false,
     }
-
-    if let Some(marker_secs) = activity_marker_secs {
-        if marker_secs > waiting.since_secs {
-            return true;
-        }
-    }
-
-    cpu_usage >= 1.0
 }
 
 /// Reads the current git branch for a directory (best-effort).
@@ -70,6 +56,7 @@ fn scan_lock_files(
     sys: &System,
     waiting_since: &HashMap<String, WaitingState>,
     start_times: &mut HashMap<String, u64>,
+    resume_votes: &mut HashMap<String, u8>,
 ) -> (Vec<AgentSession>, Vec<String>) {
     let lock_dir = match dirs::home_dir() {
         Some(h) => h.join(".claude").join("ide"),
@@ -118,10 +105,22 @@ fn scan_lock_files(
             .or_insert_with(now_secs);
 
         let status = if let Some(waiting) = waiting_since.get(&project_path) {
-            let modified_secs = file_modified_secs(&path);
+            let cpu_usage = sys
+                .process(Pid::from_u32(lock.pid))
+                .map(|p| p.cpu_usage())
+                .unwrap_or(0.0);
+            let active_polls = if waiting.pid == Some(lock.pid) && cpu_usage >= 2.0 {
+                let votes = resume_votes.entry(project_path.clone()).or_insert(0);
+                *votes = votes.saturating_add(1);
+                *votes
+            } else {
+                resume_votes.remove(&project_path);
+                0
+            };
 
-            if should_resume(waiting, lock.pid, sys.process(Pid::from_u32(lock.pid)).map(|p| p.cpu_usage()).unwrap_or(0.0), modified_secs) {
+            if should_resume(waiting, lock.pid, cpu_usage, active_polls) {
                 resumed_projects.push(project_path.clone());
+                resume_votes.remove(&project_path);
                 AgentStatus::Running {
                     since_secs: now_secs().saturating_sub(seen_since),
                 }
@@ -131,6 +130,7 @@ fn scan_lock_files(
                 }
             }
         } else {
+            resume_votes.remove(&project_path);
             AgentStatus::Running {
                 since_secs: now_secs().saturating_sub(seen_since),
             }
@@ -156,6 +156,7 @@ fn scan_processes(
     waiting_since: &HashMap<String, WaitingState>,
     start_times: &mut HashMap<String, u64>,
     existing_sessions: &[AgentSession],
+    resume_votes: &mut HashMap<String, u8>,
 ) -> (Vec<AgentSession>, Vec<String>) {
     let mut sessions = vec![];
     let mut resumed_projects = vec![];
@@ -250,8 +251,18 @@ fn scan_processes(
             .or_insert_with(now_secs);
 
         let status = if let Some(waiting) = waiting_since.get(&cwd) {
-            if should_resume(waiting, pid.as_u32(), process.cpu_usage(), None) {
+            let active_polls = if waiting.pid == Some(pid.as_u32()) && process.cpu_usage() >= 2.0 {
+                let votes = resume_votes.entry(cwd.clone()).or_insert(0);
+                *votes = votes.saturating_add(1);
+                *votes
+            } else {
+                resume_votes.remove(&cwd);
+                0
+            };
+
+            if should_resume(waiting, pid.as_u32(), process.cpu_usage(), active_polls) {
                 resumed_projects.push(cwd.clone());
+                resume_votes.remove(&cwd);
                 AgentStatus::Running {
                     since_secs: now_secs().saturating_sub(seen_since),
                 }
@@ -261,6 +272,7 @@ fn scan_processes(
                 }
             }
         } else {
+            resume_votes.remove(&cwd);
             AgentStatus::Running {
                 since_secs: now_secs().saturating_sub(seen_since),
             }
@@ -294,6 +306,7 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
     );
     let mut sys = System::new_with_specifics(refresh_kind);
     let mut start_times: HashMap<String, u64> = HashMap::new();
+    let mut resume_votes: HashMap<String, u8> = HashMap::new();
 
     loop {
         // Refresh uniquement ce qui est nécessaire très rapidement
@@ -311,9 +324,10 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
             s.waiting_since.clone()
         };
 
-        let (mut sessions, mut resumed_projects) = scan_lock_files(&sys, &waiting_since, &mut start_times);
+        let (mut sessions, mut resumed_projects) =
+            scan_lock_files(&sys, &waiting_since, &mut start_times, &mut resume_votes);
         let (process_sessions, process_resumed_projects) =
-            scan_processes(&sys, &waiting_since, &mut start_times, &sessions);
+            scan_processes(&sys, &waiting_since, &mut start_times, &sessions, &mut resume_votes);
         sessions.extend(process_sessions);
         resumed_projects.extend(process_resumed_projects);
 
@@ -350,6 +364,7 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
         let active_locks: std::collections::HashSet<_> =
             sessions.iter().map(|s| s.lock_file.clone()).collect();
         start_times.retain(|k, _| active_locks.contains(k));
+        resume_votes.retain(|project_path, _| waiting_since.contains_key(project_path));
 
         {
             let mut s = state.lock().await;
