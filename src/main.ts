@@ -30,7 +30,12 @@ const emptyState  = document.getElementById("empty-state")!;
 const agentBadge  = document.getElementById("agent-badge")!;
 const btnMinimize = document.getElementById("btn-minimize")!;
 const btnClose    = document.getElementById("btn-close")!;
-const btnSettings = document.getElementById("btn-settings")!;
+const btnSettings       = document.getElementById("btn-settings")!;
+const settingsModal     = document.getElementById("settings-modal")!;
+const btnCloseSettings  = document.getElementById("btn-close-settings")!;
+const btnCopyConfig     = document.getElementById("btn-copy-config")!;
+const configCode        = document.getElementById("config-code")!;
+const modalStatus       = document.getElementById("modal-status")!;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -176,8 +181,48 @@ btnClose.addEventListener("click", () => {
   invoke("quit_app").catch(console.error);
 });
 
-btnSettings.addEventListener("click", () => {
-  invoke("open_settings").catch(console.error);
+btnSettings.addEventListener("click", async () => {
+  console.log("BOUTON CLIQUE !");
+  try {
+    const config: any = await invoke("get_config");
+    const port = config.port || "PORT_INTROUVABLE";
+    const token = config.token || "<TOKEN_INTROUVABLE>";
+    
+    configCode.textContent = `"hooks": {
+  "Stop": [{
+    "matcher": "",
+    "hooks": [{
+      "type": "command",
+      "command": "curl -s -X POST http://127.0.0.1:${port}/hook -H \\"Content-Type: application/json\\" -d \\"{\\\\\\"token\\\\\\":\\\\\\"${token}\\\\\\",\\\\\\"project_dir\\\\\\":\\\\\\"$CLAUDE_PROJECT_DIR\\\\\\"}\\""
+    }]
+  }]
+}`;
+    
+    modalStatus.textContent = "";
+    settingsModal.style.display = "flex";
+  } catch (e: any) {
+    alert("CRASH JAVASCRIPT: " + e.toString());
+    console.error("Failed to load config:", e);
+  }
+});
+
+btnCloseSettings.addEventListener("click", () => {
+  settingsModal.style.display = "none";
+});
+
+btnCopyConfig.addEventListener("click", async () => {
+  try {
+    const code = configCode.textContent || "";
+    await navigator.clipboard.writeText(code);
+    modalStatus.textContent = "Copié dans le presse-papier !";
+    setTimeout(() => {
+      if (modalStatus.textContent === "Copié dans le presse-papier !") {
+        modalStatus.textContent = "";
+      }
+    }, 2500);
+  } catch (err) {
+    modalStatus.textContent = "Échec de la copie";
+  }
 });
 
 // ─── Tauri events ──────────────────────────────────────────────────────────────

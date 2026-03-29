@@ -14,18 +14,18 @@
       {
         "label": "dashboard",
         "title": "SynapseHub",
-        "width": 380,
-        "height": 480,
-        "minWidth": 320,
+        "width": 440,
+        "height": 520,
+        "minWidth": 400,
         "minHeight": 300,
         "visible": false,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "resizable": false,
+        "resizable": true,
         "shadow": true,
-        "center": false
+        "center": true
       }
     ],
     "security": {
