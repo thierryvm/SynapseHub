@@ -16,7 +16,7 @@
 //! ```
 //!
 //! Or, using curl directly (no helper binary needed):
-//! ```
+//! ```bash
 //! curl -s -X POST http://127.0.0.1:PORT/hook \
 //!   -H "Content-Type: application/json" \
 //!   -d "{\"token\":\"TOKEN\",\"project_dir\":\"$CLAUDE_PROJECT_DIR\",\"pid\":$PPID}"
