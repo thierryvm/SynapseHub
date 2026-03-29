@@ -182,9 +182,8 @@ btnClose.addEventListener("click", () => {
 });
 
 btnSettings.addEventListener("click", async () => {
-  console.log("BOUTON CLIQUE !");
   try {
-    const config: any = await invoke("get_config");
+    const config = await invoke<{ port?: number; token?: string }>("get_config");
     const port = config.port || "PORT_INTROUVABLE";
     const token = config.token || "<TOKEN_INTROUVABLE>";
     
@@ -201,7 +200,8 @@ btnSettings.addEventListener("click", async () => {
     modalStatus.textContent = "";
     settingsModal.style.display = "flex";
   } catch (e: any) {
-    alert("CRASH JAVASCRIPT: " + e.toString());
+    modalStatus.textContent = "Impossible de charger la configuration";
+    settingsModal.style.display = "flex";
     console.error("Failed to load config:", e);
   }
 });
