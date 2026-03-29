@@ -1,134 +1,40 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
-
-type AgentStatus =
-  | { type: "Running"; since_secs: number }
-  | { type: "Waiting"; since_secs: number }
-  | { type: "Idle" };
-
-interface AgentSession {
-  pid: number;
-  project_name: string;
-  project_path: string;
-  ide_name: string;
-  git_branch: string | null;
-  status: AgentStatus;
-  lock_file: string;
-}
-
-// ─── State ─────────────────────────────────────────────────────────────────────
+import {
+  type AgentSession,
+  getStatusDuration,
+  getStatusKey,
+  getStatusLabel,
+  projectNameFromPath,
+  sortSessions,
+  summarizeSessions,
+} from "./session-view";
 
 let sessions: AgentSession[] = [];
 
-// ─── DOM refs ──────────────────────────────────────────────────────────────────
-
-const agentList   = document.getElementById("agent-list")!;
-const emptyState  = document.getElementById("empty-state")!;
-const agentBadge  = document.getElementById("agent-badge")!;
+const agentList = document.getElementById("agent-list")!;
+const emptyState = document.getElementById("empty-state")!;
+const agentBadge = document.getElementById("agent-badge")!;
 const btnMinimize = document.getElementById("btn-minimize")!;
-const btnClose    = document.getElementById("btn-close")!;
-const btnSettings       = document.getElementById("btn-settings")!;
-const settingsModal     = document.getElementById("settings-modal")!;
-const btnCloseSettings  = document.getElementById("btn-close-settings")!;
-const btnCopyConfig     = document.getElementById("btn-copy-config")!;
-const configCode        = document.getElementById("config-code")!;
-const modalStatus       = document.getElementById("modal-status")!;
+const btnClose = document.getElementById("btn-close")!;
+const btnSettings = document.getElementById("btn-settings")!;
+const settingsModal = document.getElementById("settings-modal")!;
+const btnCloseSettings = document.getElementById("btn-close-settings")!;
+const btnCopyConfig = document.getElementById("btn-copy-config")!;
+const configCode = document.getElementById("config-code")!;
+const modalStatus = document.getElementById("modal-status")!;
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-function formatDuration(secs: number): string {
-  if (secs < 60)  return `${secs}s`;
-  if (secs < 3600) {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return s > 0 ? `${m}m${s}s` : `${m}m`;
-  }
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  return m > 0 ? `${h}h${m}m` : `${h}h`;
-}
-
-function getStatusKey(status: AgentStatus): "running" | "waiting" | "idle" {
-  return status.type.toLowerCase() as "running" | "waiting" | "idle";
-}
-
-function getStatusLabel(status: AgentStatus): string {
-  switch (status.type) {
-    case "Running": return "En cours";
-    case "Waiting": return "En attente";
-    case "Idle":    return "Inactif";
-  }
-}
-
-function getStatusDuration(status: AgentStatus): string | null {
-  if (status.type === "Running" || status.type === "Waiting") {
-    return formatDuration(status.since_secs);
-  }
-  return null;
-}
-
-function projectNameFromPath(path: string): string {
-  return path.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? path;
-}
-
-// ─── Render ────────────────────────────────────────────────────────────────────
-
-function renderCard(session: AgentSession): HTMLElement {
-  const statusKey = getStatusKey(session.status);
-  const duration  = getStatusDuration(session.status);
-
-  const card = document.createElement("div");
-  card.className  = "agent-card";
-  card.dataset.status = statusKey;
-  card.setAttribute("aria-label", `${session.project_name} — ${getStatusLabel(session.status)}`);
-
-  card.innerHTML = `
-    <div class="status-indicator" data-status="${statusKey}" aria-hidden="true"></div>
-
-    <div class="card-body">
-      <div class="card-project">${escHtml(session.project_name)}</div>
-      ${session.git_branch
-        ? `<div class="card-branch">⎇ ${escHtml(session.git_branch)}</div>`
-        : ""}
-      <div class="card-meta">
-        <span class="card-ide">${escHtml(session.ide_name)}</span>
-        <span class="card-sep" aria-hidden="true"></span>
-        <span class="card-status-label" data-status="${statusKey}">
-          ${statusKey === "waiting" ? '<span class="waiting-badge">Attend</span>' : getStatusLabel(session.status)}
-        </span>
-        ${duration
-          ? `<span class="card-sep" aria-hidden="true"></span>
-             <span class="card-duration">${escHtml(duration)}</span>`
-          : ""}
-      </div>
-    </div>
-
-    <button class="card-focus" title="Mettre au premier plan" aria-label="Focus ${escHtml(session.project_name)}">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-        <path d="M15 3h6v6M9 21H3v-6M21 3l-9 9M3 21l9-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
-  `;
-
-  // Focus window on card or button click
-  const focusBtn = card.querySelector<HTMLButtonElement>(".card-focus")!;
-  const handleFocus = (e: Event) => {
-    e.stopPropagation();
-
-    if (session.status.type === "Waiting") {
-      invoke("acknowledge_waiting", { projectPath: session.project_path }).catch(console.error);
-    }
-
-    invoke("focus_window", { pid: session.pid }).catch(console.error);
-  };
-  card.addEventListener("click", handleFocus);
-  focusBtn.addEventListener("click", handleFocus);
-
-  return card;
-}
+const heroKicker = document.getElementById("hero-kicker")!;
+const heroTitle = document.getElementById("hero-title")!;
+const heroSubtitle = document.getElementById("hero-subtitle")!;
+const runningCount = document.getElementById("running-count")!;
+const waitingCount = document.getElementById("waiting-count")!;
+const projectsCount = document.getElementById("projects-count")!;
+const runningMeta = document.getElementById("running-meta")!;
+const waitingMeta = document.getElementById("waiting-meta")!;
+const projectsMeta = document.getElementById("projects-meta")!;
+const sectionCount = document.getElementById("section-count")!;
+const footerDetail = document.getElementById("footer-detail")!;
 
 function escHtml(str: string): string {
   return str
@@ -138,45 +44,118 @@ function escHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function renderCard(session: AgentSession): HTMLElement {
+  const statusKey = getStatusKey(session.status);
+  const duration = getStatusDuration(session.status);
+  const projectLabel = session.project_name || projectNameFromPath(session.project_path);
+
+  const card = document.createElement("article");
+  card.className = "agent-card";
+  card.dataset.status = statusKey;
+  card.setAttribute("aria-label", `${projectLabel} — ${getStatusLabel(session.status)}`);
+
+  card.innerHTML = `
+    <div class="card-topline">
+      <div class="card-signal">
+        <span class="status-indicator" data-status="${statusKey}" aria-hidden="true"></span>
+        <div>
+          <p class="card-project">${escHtml(projectLabel)}</p>
+          <p class="card-path">${escHtml(session.project_path)}</p>
+        </div>
+      </div>
+      <button class="card-focus" title="Mettre au premier plan" aria-label="Focus ${escHtml(projectLabel)}">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-9 9M3 21l9-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="card-strip">
+      <span class="pill pill--soft">${escHtml(session.ide_name)}</span>
+      ${
+        session.git_branch
+          ? `<span class="pill pill--branch">⎇ ${escHtml(session.git_branch)}</span>`
+          : `<span class="pill pill--ghost">No branch</span>`
+      }
+      <span class="pill pill--status" data-status="${statusKey}">
+        ${statusKey === "waiting" ? "Attend une reprise" : escHtml(getStatusLabel(session.status))}
+      </span>
+    </div>
+
+    ${
+      duration
+        ? `<div class="card-footnote">Actif depuis <strong>${escHtml(duration)}</strong></div>`
+        : `<div class="card-footnote">Session détectée, sans activité en cours</div>`
+    }
+  `;
+
+  const focusBtn = card.querySelector<HTMLButtonElement>(".card-focus")!;
+  const handleFocus = (event: Event) => {
+    event.stopPropagation();
+
+    if (session.status.type === "Waiting") {
+      invoke("acknowledge_waiting", { projectPath: session.project_path }).catch(console.error);
+    }
+
+    invoke("focus_window", { pid: session.pid }).catch(console.error);
+  };
+
+  card.addEventListener("click", handleFocus);
+  focusBtn.addEventListener("click", handleFocus);
+
+  return card;
+}
+
+function updateSummary(): void {
+  const summary = summarizeSessions(sessions);
+  const waitingSessions = sessions.filter((session) => session.status.type === "Waiting");
+
+  heroKicker.textContent = waitingSessions.length > 0 ? "Attention requise" : "Monitoring local";
+  heroTitle.textContent = summary.title;
+  heroSubtitle.textContent = summary.subtitle;
+
+  runningCount.textContent = String(summary.runningCount);
+  waitingCount.textContent = String(summary.waitingCount);
+  projectsCount.textContent = String(summary.trackedProjects);
+
+  runningMeta.textContent =
+    summary.runningCount > 0 ? "Agents actuellement productifs" : "Aucune session en exécution";
+  waitingMeta.textContent =
+    summary.waitingCount > 0 ? "Un retour utilisateur est attendu" : "Aucun blocage détecté";
+  projectsMeta.textContent =
+    summary.trackedProjects > 0 ? "Espaces de travail observés" : "Vos dossiers apparaîtront ici";
+
+  footerDetail.textContent = summary.footer;
+}
+
 function render(): void {
-  // Preserve empty state node
   const cards = agentList.querySelectorAll(".agent-card");
-  cards.forEach((c) => c.remove());
+  cards.forEach((card) => card.remove());
 
-  const active = sessions.filter((s) => s.status.type !== "Idle");
-  const waiting = active.filter((s) => s.status.type === "Waiting");
+  const activeSessions = sessions.filter((session) => session.status.type !== "Idle");
+  const sortedSessions = sortSessions(sessions);
 
-  // Update badge
-  if (active.length === 0) {
+  if (activeSessions.length === 0) {
     agentBadge.textContent = "Aucun agent";
     agentBadge.removeAttribute("data-count");
   } else {
-    agentBadge.textContent = `${active.length} actif${active.length > 1 ? "s" : ""}`;
-    agentBadge.dataset.count = String(active.length);
+    agentBadge.textContent = `${activeSessions.length} actif${activeSessions.length > 1 ? "s" : ""}`;
+    agentBadge.dataset.count = String(activeSessions.length);
   }
 
-  // Show / hide empty state
-  emptyState.style.display = active.length === 0 ? "" : "none";
+  sectionCount.textContent = `${activeSessions.length} active${activeSessions.length > 1 ? "s" : ""}`;
+  emptyState.style.display = activeSessions.length === 0 ? "" : "none";
 
-  // Sort: waiting first, then running, then idle
-  const sorted = [...sessions].sort((a, b) => {
-    const order = { Waiting: 0, Running: 1, Idle: 2 };
-    return order[a.status.type] - order[b.status.type];
-  });
-
-  sorted.forEach((s) => {
-    if (s.status.type !== "Idle") {
-      agentList.appendChild(renderCard(s));
+  sortedSessions.forEach((session) => {
+    if (session.status.type !== "Idle") {
+      agentList.appendChild(renderCard(session));
     }
   });
 
-  // Update window title for accessibility
-  document.title = waiting.length > 0
-    ? `SynapseHub — ${waiting.length} en attente`
-    : "SynapseHub";
+  updateSummary();
+  document.title =
+    activeSessions.length > 0 ? `SynapseHub — ${activeSessions.length} sessions live` : "SynapseHub";
 }
-
-// ─── Event listeners ───────────────────────────────────────────────────────────
 
 btnMinimize.addEventListener("click", () => {
   invoke("hide_window").catch(console.error);
@@ -191,7 +170,7 @@ btnSettings.addEventListener("click", async () => {
     const config = await invoke<{ port?: number; token?: string }>("get_config");
     const port = config.port || "PORT_INTROUVABLE";
     const token = config.token || "<TOKEN_INTROUVABLE>";
-    
+
     configCode.textContent = `"hooks": {
   "Stop": [{
     "matcher": "",
@@ -201,13 +180,13 @@ btnSettings.addEventListener("click", async () => {
     }]
   }]
 }`;
-    
+
     modalStatus.textContent = "";
     settingsModal.style.display = "flex";
-  } catch (e: any) {
+  } catch (error) {
     modalStatus.textContent = "Impossible de charger la configuration";
     settingsModal.style.display = "flex";
-    console.error("Failed to load config:", e);
+    console.error("Failed to load config:", error);
   }
 });
 
@@ -219,32 +198,28 @@ btnCopyConfig.addEventListener("click", async () => {
   try {
     const code = configCode.textContent || "";
     await navigator.clipboard.writeText(code);
-    modalStatus.textContent = "Copié dans le presse-papier !";
+    modalStatus.textContent = "Configuration copiée";
     setTimeout(() => {
-      if (modalStatus.textContent === "Copié dans le presse-papier !") {
+      if (modalStatus.textContent === "Configuration copiée") {
         modalStatus.textContent = "";
       }
     }, 2500);
-  } catch (err) {
+  } catch {
     modalStatus.textContent = "Échec de la copie";
   }
 });
-
-// ─── Tauri events ──────────────────────────────────────────────────────────────
 
 listen<AgentSession[]>("agents-updated", (event) => {
   sessions = event.payload;
   render();
 });
 
-// ─── Init ──────────────────────────────────────────────────────────────────────
-
 async function init(): Promise<void> {
   try {
     sessions = await invoke<AgentSession[]>("get_sessions");
     render();
-  } catch (e) {
-    console.error("Failed to load initial sessions:", e);
+  } catch (error) {
+    console.error("Failed to load initial sessions:", error);
   }
 }
 
