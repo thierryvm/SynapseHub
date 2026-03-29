@@ -88,6 +88,27 @@ export function summarizeSessions(sessions: AgentSession[]): SessionSummary {
     };
   }
 
+  if (activeSessions.length === 1) {
+    const session = activeSessions[0];
+    const project = session.project_name || projectNameFromPath(session.project_path);
+
+    return {
+      activeCount: 1,
+      runningCount,
+      waitingCount,
+      trackedProjects,
+      title:
+        session.status.type === "Waiting"
+          ? `${session.ide_name} attend sur ${project}`
+          : `${session.ide_name} actif sur ${project}`,
+      subtitle:
+        session.status.type === "Waiting"
+          ? "La session a besoin d'une reprise ou d'une interaction utilisateur."
+          : "Une session IA est en cours sur ce projet.",
+      footer: session.git_branch ? `Branche ${session.git_branch}` : "Projet suivi sans branche detectee",
+    };
+  }
+
   if (waitingCount > 0) {
     const noun = waitingCount > 1 ? "agents demandent" : "agent demande";
     return {
