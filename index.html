@@ -12,95 +12,154 @@
   </head>
   <body>
     <div id="app">
-      <header class="header">
-        <div class="header-brand">
-          <svg class="logo-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.9"/>
-            <circle cx="4" cy="6" r="2" fill="currentColor" opacity="0.6"/>
-            <circle cx="20" cy="6" r="2" fill="currentColor" opacity="0.6"/>
-            <circle cx="4" cy="18" r="2" fill="currentColor" opacity="0.6"/>
-            <circle cx="20" cy="18" r="2" fill="currentColor" opacity="0.6"/>
-            <line x1="12" y1="12" x2="4" y2="6" stroke="currentColor" stroke-width="1.2" opacity="0.4"/>
-            <line x1="12" y1="12" x2="20" y2="6" stroke="currentColor" stroke-width="1.2" opacity="0.4"/>
-            <line x1="12" y1="12" x2="4" y2="18" stroke="currentColor" stroke-width="1.2" opacity="0.4"/>
-            <line x1="12" y1="12" x2="20" y2="18" stroke="currentColor" stroke-width="1.2" opacity="0.4"/>
-          </svg>
-          <span class="logo-text">SynapseHub</span>
-        </div>
-        <div class="header-meta">
-          <span class="agent-badge" id="agent-badge">—</span>
-          <button class="icon-btn" id="btn-minimize" title="Réduire" aria-label="Minimize">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <div class="app-shell">
+        <header class="header">
+          <div class="header-brand">
+            <svg class="logo-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.9" />
+              <circle cx="4" cy="6" r="2" fill="currentColor" opacity="0.55" />
+              <circle cx="20" cy="6" r="2" fill="currentColor" opacity="0.55" />
+              <circle cx="4" cy="18" r="2" fill="currentColor" opacity="0.55" />
+              <circle cx="20" cy="18" r="2" fill="currentColor" opacity="0.55" />
+              <line x1="12" y1="12" x2="4" y2="6" stroke="currentColor" stroke-width="1.2" opacity="0.32" />
+              <line x1="12" y1="12" x2="20" y2="6" stroke="currentColor" stroke-width="1.2" opacity="0.32" />
+              <line x1="12" y1="12" x2="4" y2="18" stroke="currentColor" stroke-width="1.2" opacity="0.32" />
+              <line x1="12" y1="12" x2="20" y2="18" stroke="currentColor" stroke-width="1.2" opacity="0.32" />
             </svg>
-          </button>
-          <button class="icon-btn" id="btn-close" title="Fermer" aria-label="Close">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </button>
-        </div>
-      </header>
-
-      <main class="agent-list" id="agent-list">
-        <div class="empty-state" id="empty-state">
-          <div class="empty-icon pulse-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.2" opacity="0.3"/>
-              <path d="M12 8v4l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.8"/>
-            </svg>
+            <div class="brand-copy">
+              <span class="logo-text">SynapseHub</span>
+              <span class="logo-subtext">Agent operations desk</span>
+            </div>
           </div>
-          <p class="empty-title">En attente d'agent(s) IA...</p>
-          <p class="empty-sub">Lancez un terminal avec Claude Code, ou ouvrez Antigravity / Cursor pour le voir apparaître instantanément.</p>
-        </div>
-      </main>
+          <div class="header-meta">
+            <span class="agent-badge" id="agent-badge">—</span>
+            <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Settings">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+            <button class="icon-btn" id="btn-minimize" title="Réduire" aria-label="Minimize">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button class="icon-btn" id="btn-close" title="Fermer" aria-label="Close">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+        </header>
 
-      <footer class="footer">
-        <div class="footer-status" id="footer-status">
-          <span class="status-dot status-dot--ok"></span>
-          <span class="footer-text">Surveillance active</span>
+        <div class="dashboard-scroll">
+          <section class="hero-panel">
+            <div class="hero-copy">
+              <p class="hero-kicker" id="hero-kicker">Monitoring local</p>
+              <h1 class="hero-title" id="hero-title">Prêt à suivre vos agents</h1>
+              <p class="hero-subtitle" id="hero-subtitle">
+                SynapseHub surveille vos sessions Claude Code, Cursor et Antigravity en temps réel.
+              </p>
+            </div>
+            <div class="hero-orbit" aria-hidden="true">
+              <div class="orbit-core"></div>
+              <div class="orbit-ring orbit-ring--one"></div>
+              <div class="orbit-ring orbit-ring--two"></div>
+            </div>
+          </section>
+
+          <section class="stats-grid" aria-label="Résumé d'activité">
+            <article class="stat-card stat-card--running">
+              <span class="stat-label">En cours</span>
+              <strong class="stat-value" id="running-count">0</strong>
+              <span class="stat-meta" id="running-meta">Aucune session active</span>
+            </article>
+            <article class="stat-card stat-card--waiting">
+              <span class="stat-label">En attente</span>
+              <strong class="stat-value" id="waiting-count">0</strong>
+              <span class="stat-meta" id="waiting-meta">Aucun blocage détecté</span>
+            </article>
+            <article class="stat-card stat-card--focus">
+              <span class="stat-label">Projets suivis</span>
+              <strong class="stat-value" id="projects-count">0</strong>
+              <span class="stat-meta" id="projects-meta">Vos dossiers récents</span>
+            </article>
+          </section>
+
+          <section class="section-heading">
+            <div>
+              <p class="section-kicker">Live feed</p>
+              <h2 class="section-title">Sessions détectées</h2>
+            </div>
+            <span class="section-count" id="section-count">0 actives</span>
+          </section>
+
+          <main class="agent-list" id="agent-list">
+            <div class="empty-state" id="empty-state">
+              <div class="empty-orbit" aria-hidden="true">
+                <div class="empty-orbit__core"></div>
+                <div class="empty-orbit__ring"></div>
+              </div>
+              <p class="empty-title">Le hub est calme pour l’instant</p>
+              <p class="empty-sub">
+                Lancez Claude Code, Cursor ou Antigravity sur un projet pour remplir automatiquement le tableau de bord.
+              </p>
+            </div>
+          </main>
         </div>
-        <div class="footer-actions">
-          <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Settings">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-          </button>
+
+        <footer class="footer">
+          <div class="footer-status" id="footer-status">
+            <span class="status-dot status-dot--ok"></span>
+            <div>
+              <div class="footer-text">Surveillance active</div>
+              <div class="footer-subtext" id="footer-detail">Aucun agent critique</div>
+            </div>
+          </div>
           <span class="version-label">v0.1.0</span>
-        </div>
-      </footer>
+        </footer>
+      </div>
 
-      <!-- Settings Modal (Bottom Sheet) -->
       <div id="settings-modal" class="modal-overlay" style="display: none;">
         <div class="bottom-sheet">
           <div class="sheet-drag-handle"></div>
           <div class="modal-header">
-            <h2>Guide & Paramètres</h2>
+            <div>
+              <p class="section-kicker">Setup</p>
+              <h2>Guide & Paramètres</h2>
+            </div>
             <button class="icon-btn" id="btn-close-settings" title="Fermer" aria-label="Close Settings">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
               </svg>
             </button>
           </div>
-          <div class="modal-body" style="gap: 16px;">
-            <div class="guide-section">
-              <h3><span class="guide-icon">✨</span> Détection Zéro Config</h3>
-              <p class="modal-text">Vos IDE et outils <strong>(Cursor, Windsurf, Antigravity, VSCode)</strong> sont détectés <strong>automatiquement</strong> par le système dès qu'ils s'ouvrent sur un de vos projets. Absolument aucun réglage n'est requis de votre part !</p>
+
+          <div class="modal-body">
+            <div class="guide-grid">
+              <section class="guide-card">
+                <p class="guide-index">01</p>
+                <h3>Détection instantanée</h3>
+                <p class="modal-text">
+                  Cursor, Windsurf, Antigravity et VS Code sont détectés automatiquement dès qu’un projet est ouvert.
+                </p>
+              </section>
+              <section class="guide-card">
+                <p class="guide-index">02</p>
+                <h3>Mode “En attente”</h3>
+                <p class="modal-text">
+                  Activez le hook local ci-dessous pour remonter les pauses d’interaction de Claude Code sans exposer le token dans les logs.
+                </p>
+              </section>
             </div>
 
-            <div class="guide-divider"></div>
-
-            <div class="guide-section">
-              <h3><span class="guide-icon">⚙️</span> Statut Avancé "En attente"</h3>
-              <p class="modal-text">Par défaut le statut sera "Actif". Pour activer la détection du mode "<strong>En attente d'interaction</strong>" sur un outil externe (comme <em>Claude Code</em> via son <code>settings.json</code>), vous pouvez utiliser le WebHook ci-dessous :</p>
-              <div class="code-block-wrapper">
-                <pre class="code-block"><code id="config-code">Chargement...</code></pre>
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                  <button class="btn-primary" id="btn-copy-config">Copier l'URL & JSON</button>
-                  <span class="modal-status" id="modal-status"></span>
-                </div>
+            <div class="code-block-wrapper">
+              <div class="code-block-header">
+                <span>Configuration `settings.json`</span>
+                <button class="btn-primary" id="btn-copy-config">Copier</button>
               </div>
+              <pre class="code-block"><code id="config-code">Chargement...</code></pre>
+              <span class="modal-status" id="modal-status" role="status" aria-live="polite"></span>
             </div>
           </div>
         </div>
