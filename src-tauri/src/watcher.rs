@@ -110,7 +110,8 @@ fn scan_lock_files(
                 .process(Pid::from_u32(lock.pid))
                 .map(|p| p.cpu_usage())
                 .unwrap_or(0.0);
-            let active_polls = if waiting.pid == Some(lock.pid) && cpu_usage >= RESUME_CPU_THRESHOLD {
+            let active_polls = if waiting.pid == Some(lock.pid) && cpu_usage >= RESUME_CPU_THRESHOLD
+            {
                 let votes = resume_votes.entry(project_path.clone()).or_insert(0);
                 *votes = votes.saturating_add(1);
                 *votes
@@ -269,8 +270,9 @@ fn scan_processes(
             .or_insert_with(now_secs);
 
         let status = if let Some(waiting) = waiting_since.get(&cwd) {
-            let active_polls =
-                if waiting.pid == Some(pid.as_u32()) && process.cpu_usage() >= RESUME_CPU_THRESHOLD {
+            let active_polls = if waiting.pid == Some(pid.as_u32())
+                && process.cpu_usage() >= RESUME_CPU_THRESHOLD
+            {
                 let votes = resume_votes.entry(cwd.clone()).or_insert(0);
                 *votes = votes.saturating_add(1);
                 *votes
