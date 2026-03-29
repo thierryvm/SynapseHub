@@ -28,15 +28,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use axum::{
-    Json, Router,
-    extract::State,
-    http::StatusCode,
-    routing::post,
-};
-use tokio::sync::Mutex;
+use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use tauri::AppHandle;
 use tauri::Emitter;
+use tokio::sync::Mutex;
 
 use crate::types::{AppState, HookPayload, WaitingState};
 
@@ -47,10 +42,7 @@ struct HookState {
     secret: String,
 }
 
-async fn handle_hook(
-    State(hs): State<HookState>,
-    Json(payload): Json<HookPayload>,
-) -> StatusCode {
+async fn handle_hook(State(hs): State<HookState>, Json(payload): Json<HookPayload>) -> StatusCode {
     // Validate shared secret (constant-time comparison via subtle would be
     // ideal; for a localhost-only server this is acceptable).
     if payload.token != hs.secret {
@@ -65,15 +57,13 @@ async fn handle_hook(
 
     {
         let mut state = hs.app_state.lock().await;
-        state
-            .waiting_since
-            .insert(
-                payload.project_dir.clone(),
-                WaitingState {
-                    since_secs: now,
-                    pid: payload.pid,
-                },
-            );
+        state.waiting_since.insert(
+            payload.project_dir.clone(),
+            WaitingState {
+                since_secs: now,
+                pid: payload.pid,
+            },
+        );
     }
 
     // Notify the tray icon and dashboard
@@ -97,11 +87,7 @@ async fn handle_hook(
 
 /// Starts the HTTP hook receiver on a random available port.
 /// Returns the port so callers can display it in the UI / setup wizard.
-pub async fn start_hook_server(
-    state: Arc<Mutex<AppState>>,
-    app: AppHandle,
-    secret: String,
-) -> u16 {
+pub async fn start_hook_server(state: Arc<Mutex<AppState>>, app: AppHandle, secret: String) -> u16 {
     let hook_state = HookState {
         app_state: state,
         app_handle: app,

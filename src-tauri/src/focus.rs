@@ -27,14 +27,14 @@ fn focus_windows(pid: u32) -> bool {
     use windows_sys::Win32::{
         Foundation::HWND,
         UI::WindowsAndMessaging::{
-            EnumWindows, GetWindowThreadProcessId, IsWindowVisible,
-            SetForegroundWindow, ShowWindow, SW_RESTORE,
+            EnumWindows, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow,
+            ShowWindow, SW_RESTORE,
         },
     };
 
     // HWND is *mut c_void — store as usize for atomic access across threads.
     static FOUND_HWND: AtomicUsize = AtomicUsize::new(0);
-    static TARGET_PID: AtomicU32   = AtomicU32::new(0);
+    static TARGET_PID: AtomicU32 = AtomicU32::new(0);
 
     TARGET_PID.store(pid, Ordering::SeqCst);
     FOUND_HWND.store(0, Ordering::SeqCst);
