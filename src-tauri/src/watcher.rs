@@ -57,6 +57,11 @@ fn project_name(path: &str) -> String {
         .to_owned()
 }
 
+/// Stable deduplication key per visible agent on a project.
+fn session_identity(project_path: &str, ide_name: &str) -> String {
+    format!("{project_path}::{ide_name}")
+}
+
 /// Returns true when a path points to system-owned locations that do not
 /// represent a user project we should surface in the dashboard.
 fn is_system_path(path: &str) -> bool {
@@ -263,11 +268,13 @@ fn scan_processes(
 ) -> (Vec<AgentSession>, Vec<String>) {
     let mut sessions = vec![];
     let mut resumed_projects = vec![];
-    let mut seen_projects = std::collections::HashSet::new();
+    let mut seen_sessions = std::collections::HashSet::new();
 
-    // Preremplir avec les projets déjà trouvés par scan_lock_files
+    // Pre-fill with sessions already found via lock files so we keep one visible
+    // entry per project + agent kind, while still allowing Codex and Claude to
+    // coexist on the same repository.
     for s in existing_sessions {
-        seen_projects.insert(s.project_path.clone());
+        seen_sessions.insert(session_identity(&s.project_path, &s.ide_name));
     }
 
     for (pid, process) in sys.processes() {
@@ -290,11 +297,13 @@ fn scan_processes(
             None => continue,
         };
 
-        // Avoid duplicating sessions for the same project
-        if seen_projects.contains(&cwd) {
+        let identity = session_identity(&cwd, ide_name);
+
+        // Avoid duplicating the exact same visible agent on the same project.
+        if seen_sessions.contains(&identity) {
             continue;
         }
-        seen_projects.insert(cwd.clone());
+        seen_sessions.insert(identity);
 
         // Use a stable identifier to track uptime
         let lock_file = format!("process_{}", cwd);
