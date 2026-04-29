@@ -27,6 +27,9 @@ jobs:
       - name: npm ci
         run: npm ci
 
+      - name: Frontend tests (vitest)
+        run: npm test
+
       - name: npm run build
         run: npm run build
 

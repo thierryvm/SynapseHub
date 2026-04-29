@@ -35,6 +35,7 @@ const btnInstallUpdate = document.getElementById("btn-install-update") as HTMLBu
 const heroKicker = document.getElementById("hero-kicker")!;
 const heroTitle = document.getElementById("hero-title")!;
 const heroSubtitle = document.getElementById("hero-subtitle")!;
+const heroOrbit = document.querySelector<HTMLElement>(".hero-orbit");
 const runningCount = document.getElementById("running-count")!;
 const waitingCount = document.getElementById("waiting-count")!;
 const projectsCount = document.getElementById("projects-count")!;
@@ -367,7 +368,14 @@ function render(): void {
   }
 
   sectionCount.textContent = `${activeSessions.length} active${activeSessions.length > 1 ? "s" : ""}`;
-  emptyState.style.display = activeSessions.length === 0 ? "" : "none";
+  const isEmpty = activeSessions.length === 0;
+  emptyState.style.display = isEmpty ? "" : "none";
+  // Single visual focus: hero-orbit when at least one agent is active,
+  // empty-orbit when the dashboard is calm. Showing both was redundant
+  // and split the user's attention in the empty state.
+  if (heroOrbit) {
+    heroOrbit.style.display = isEmpty ? "none" : "";
+  }
 
   sortedSessions.forEach((session) => {
     agentList.appendChild(renderCard(session));
