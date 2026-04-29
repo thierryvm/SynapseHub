@@ -40,6 +40,24 @@ The current public key fingerprint in `tauri.conf.json` is `BD5AA9E173A8A318` (v
 
 To regenerate the keypair, follow the same procedure, **bump the SynapseHub minor version**, and ship a hard cutover release — installs running the previous public key cannot validate updates signed by the new private key.
 
+### Local development environment variables
+
+Copy `.env.example` (committed at the repo root) to `.env.local` (git-ignored) and fill in only the values you actually need.
+
+As of v0.1.1, SynapseHub itself does **not** consume any custom environment variables — the hook server picks a random loopback port at startup, the polling cadence is hard-coded in `watcher.rs`, and runtime configuration lives under the OS config directory (`%APPDATA%\synapsehub\` on Windows, `~/Library/Application Support/synapsehub/` on macOS, `~/.config/synapsehub/` on Linux).
+
+The two variables that *do* influence local builds today are:
+
+| Variable | Consumer | Notes |
+|---|---|---|
+| `RUST_LOG` | `env_logger::init()` in `src-tauri/src/lib.rs::run` | Levels: `error` / `warn` / `info` / `debug` / `trace`. Default `warn`. |
+| `TAURI_ENV_DEBUG` | `vite.config.ts` (lines 15-16) | Set automatically by `npm run tauri dev`; you normally do not touch it. |
+
+Any future configuration that *should* be env-driven (e.g. `SYNAPSEHUB_HOOK_PORT`) gets added simultaneously to:
+- `.env.example`
+- This document
+- `CONTRIBUTING.md` if it affects new contributors
+
 ## Step 1 — Prepare the version
 
 1. Open a `feat/vX.Y.Z-ergonomics` (or similar) branch for the version bump and any UX/CI cleanup.
