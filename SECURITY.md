@@ -49,9 +49,19 @@ Out of scope:
 
 Every push and pull request to `main` runs:
 
-- `cargo audit` (via `rustsec/audit-check`) for known Rust dependency advisories.
+- `cargo audit` (binary installed via `taiki-e/install-action`) for known Rust dependency advisories.
 - `cargo clippy -D warnings` and `cargo test` to keep the static analysis floor.
 
 `npm audit` is run manually by maintainers before each release. JavaScript dependency vulnerabilities only affect the development server, not the bundled production WebView.
+
+## Known advisories ignored in audit
+
+`src-tauri/audit.toml` contains an explicit ignore list. Each entry is documented inline with a rationale and a tracking issue. Current entries:
+
+| Advisory | Crate | Path | Rationale | Tracker |
+|---|---|---|---|---|
+| [RUSTSEC-2026-0097](https://rustsec.org/advisories/RUSTSEC-2026-0097) | `rand 0.9.2` | transitive via `tauri-plugin-notification 2.3.3` | (1) SynapseHub code uses `OsRng + RngCore::fill_bytes` on `rand 0.8.5`, not `rand::rng()`; (2) `tauri-plugin-notification` uses `rand` only for notification IDs, not the vulnerable pattern (`rand::rng()` + custom logger that calls back into `rand`); (3) `tauri-plugin-notification 2.3.3` is the latest published version — no upstream patch available yet | [#13](https://github.com/thierryvm/SynapseHub/issues/13) |
+
+Each ignored advisory is re-verified on every SynapseHub release. Entries are removed as soon as the upstream chain ships a patched version.
 
 Thank you for helping keep SynapseHub secure.

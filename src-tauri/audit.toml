@@ -1,0 +1,13 @@
+[advisories]
+ignore = [
+  # RUSTSEC-2026-0097 : rand 0.9.2 unsound with custom logger using rand::rng()
+  # Chaîne transitive : rand 0.9.2 ← tauri-plugin-notification 2.3.3 ← synapsehub
+  # Pourquoi on ignore :
+  #   1. Notre code utilise OsRng + RngCore::fill_bytes (rand 0.8.5), PAS rand::rng()
+  #   2. tauri-plugin-notification utilise rand uniquement pour des IDs de notification,
+  #      pas le pattern vulnérable (rand::rng() + custom logger qui rappelle dans rand)
+  #   3. tauri-plugin-notification 2.3.3 = dernière version, pas de patch upstream dispo
+  # À retirer dès que tauri-plugin-notification bump rand → tracker GitHub issue (cf. ci-dessous)
+  # Re-vérifier à chaque release SynapseHub.
+  "RUSTSEC-2026-0097",
+]
