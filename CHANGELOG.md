@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-04-29
+
+### Fixed
+- **Watcher Windows — détection Claude Code Terminal CLI v2026** ([#24](https://github.com/thierryvm/SynapseHub/issues/24)). Le pattern matching dans `detect_ide_name` était trop restrictif (`claude-code`, `@anthropic-ai`, `claude.cmd` uniquement) et misclassifiait les sessions CC Terminal CLI v2026 sur Windows comme `Claude Desktop`. La cmd line v2026 est ultra-minimaliste (`claude  --dangerously-skip-permissions -c`), sans path préfixe. Patterns élargis : `claude` / `claude.exe` / `"claude" ` (bare-name invocations), avec garde anti-faux-positif sur `\windowsapps\claude_` qui distingue l'Electron desktop.
+- **Distinction Claude Desktop vs CC Terminal** — la branche Claude Desktop est désormais positivement gatée sur le path complet WindowsApps (Windows) ou `/applications/claude.app/` (macOS). Un `claude.exe` orphelin sans préfixe de path est traité comme CC Terminal et non plus comme Desktop.
+- **Résolution `cwd` sur Windows** — le `RefreshKind` du watcher n'appelait jamais `.with_cwd(...)`, ce qui faisait que sysinfo Windows ne populait jamais le field `cwd` (cf. `sysinfo-0.33.1/src/windows/process.rs:816`). Conséquence : `process.cwd()` retournait `None` pour tous les processes, et la résolution du project path retombait silencieusement sur l'args fallback qui échoue pour CC Terminal CLI v2026 (cmd line sans path). Ajout de `.with_cwd(UpdateKind::OnlyIfNotSet)` aux deux `ProcessRefreshKind` (init + refresh loop).
+
+### Tests
+- 4 nouveaux tests unitaires dans `watcher::tests` :
+  - `detects_claude_code_terminal_cli_v2026_windows` — reproduce @thierry smoke-test
+  - `detects_claude_code_terminal_cli_minimal` — invocation `claude` seule
+  - `does_not_misclassify_claude_desktop_as_terminal` — primary process WindowsApps
+  - `does_not_misclassify_claude_desktop_subprocess_as_terminal` — Electron renderer/utility
+- Tests Rust : 23 → 27 (Windows local). Régression-safe : les 9 tests `watcher::tests` existants restent verts.
+
+### Documentation
+- Note d'investigation `analysis/2026-04-29-watcher-windows-cwd-investigation.md` (cause primaire, cause secondaire, sources sysinfo cross-checkées) pour traçabilité du diagnostic.
+
 ## [0.1.2] - 2026-04-29
 
 ### Fixed
