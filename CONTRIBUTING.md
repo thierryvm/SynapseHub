@@ -41,6 +41,16 @@ sudo apt-get install -y \
   libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf wmctrl
 ```
 
+### 5. Security tooling (recommended)
+
+```bash
+cargo install cargo-audit
+```
+
+Run `cargo audit` (Rust) and `npm audit` (JS) before every commit that
+touches `Cargo.toml`, `Cargo.lock`, `package.json`, or `package-lock.json`.
+CI also runs `cargo audit` automatically on every push and pull request.
+
 ---
 
 ## Build
@@ -127,7 +137,7 @@ synapsehub/
 ├── scripts/
 │   └── generate-icons.mjs   # SVG → PNG via sharp
 ├── .github/workflows/
-│   ├── ci.yml               # Build + cargo audit on push/PR
+│   ├── ci.yml               # Frontend build + Rust fmt/clippy/test/audit on push/PR
 │   └── release.yml          # Auto-release on tag push
 ├── SETUP.md                 # End-user installation + hook config
 └── CONTRIBUTING.md          # This file

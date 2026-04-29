@@ -37,9 +37,21 @@ Out of scope:
 
 ## Security design notes
 
-- The local HTTP hook server binds to `127.0.0.1` only and uses a randomly generated token stored locally.
+- The local HTTP hook server binds to `127.0.0.1` only and uses a randomly generated 256-bit (64 hex chars) token stored locally.
+- The token comparison uses `subtle::ConstantTimeEq` to prevent timing-based recovery.
+- The hook server is rate-limited to 10 req/s (burst of 10) via `tower_governor` to bound a flooding attacker.
+- On Unix, the `hook_token` file is created with `0600` permissions; on Windows we rely on the per-user ACL of the config directory.
 - No credentials or secrets are ever transmitted to remote servers.
 - Hook secrets are stored in the operating system config directory (`%APPDATA%\synapsehub\` on Windows, `~/.config/synapsehub/` on macOS/Linux), not inside the repository.
 - Hook secrets must never be logged, copied into issue reports, or committed to version control.
+
+## Automated security checks
+
+Every push and pull request to `main` runs:
+
+- `cargo audit` (via `rustsec/audit-check`) for known Rust dependency advisories.
+- `cargo clippy -D warnings` and `cargo test` to keep the static analysis floor.
+
+`npm audit` is run manually by maintainers before each release. JavaScript dependency vulnerabilities only affect the development server, not the bundled production WebView.
 
 Thank you for helping keep SynapseHub secure.
