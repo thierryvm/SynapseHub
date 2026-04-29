@@ -4357,6 +4357,7 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-updater",
  "tokio",
+ "tower",
  "tower-http 0.5.2",
  "tower_governor",
  "uuid",

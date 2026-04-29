@@ -40,6 +40,12 @@ windows-sys = { version = "0.59", features = [
   "Win32_System_Threading",
 ] }
 
+[dev-dependencies]
+# `tower::util::ServiceExt::oneshot` for driving the axum Router in tests
+# without binding a TCP listener. The base `tower` crate is already pulled
+# transitively by axum / tower-http; we just enable the `util` feature here.
+tower = { version = "0.5", features = ["util"] }
+
 [profile.release]
 opt-level     = "s"
 lto           = true
