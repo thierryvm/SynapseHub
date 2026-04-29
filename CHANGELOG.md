@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-29
+
+### Fixed
+- **Updater pipeline** — `createUpdaterArtifacts: true` ajouté dans `tauri.conf.json` `bundle` (validé sur 3/4 OS via la rc.1 : Linux + macOS Intel + macOS Apple Silicon ont tous publié `latest.json` + `.sig`). Sans cette ligne, Tauri 2 stable ne génère pas les artefacts updater. Référence : [#17](https://github.com/thierryvm/SynapseHub/issues/17).
+- **Windows MSI version format** — pre-release suffix retiré pour respecter la contrainte `MAJOR.MINOR.PATCH.BUILD` numeric-only de WiX/MSI. La rc.1 avait fail sur ce point spécifique (`0.1.2-rc.1` rejeté par le bundler MSI), résolu par construction en taggant directement `0.1.2`.
+
+### Changed
+- Nouvelle paire de clés minisign générée. Pubkey rotée dans `tauri.conf.json` (fingerprint `3877AE0A82FBBFE`, vs précédent `BD5AA9E173A8A318`). Les anciens binaires v0.1.1 ne pourront pas valider les updates v0.1.2 — réinstall manuelle requise pour les early adopters de v0.1.1.
+
 ## [0.1.2-rc.1] - 2026-04-29
 
 ### Fixed

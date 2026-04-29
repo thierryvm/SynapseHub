@@ -1,6 +1,6 @@
 {
   "name": "synapsehub",
-  "version": "0.1.2-rc.1",
+  "version": "0.1.2",
   "private": true,
   "scripts": {
     "dev": "vite",
