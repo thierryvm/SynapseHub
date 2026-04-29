@@ -81,7 +81,11 @@ jobs:
         working-directory: src-tauri
         run: cargo test --all-features
 
-      - name: cargo audit
-        uses: rustsec/audit-check@v1.4.1
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          tool: cargo-audit
+
+      - name: cargo audit
+        working-directory: src-tauri
+        run: cargo audit
