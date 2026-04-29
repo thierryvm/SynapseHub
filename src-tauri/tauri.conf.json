@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "SynapseHub",
-  "version": "0.1.1",
+  "version": "0.1.2-rc.1",
   "identifier": "com.synapsehub.app",
   "build": {
     "frontendDist": "../dist",
@@ -34,6 +34,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -46,7 +47,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJENUFBOUUxNzNBOEEzMTgKUldRWW82aHo0YWxhdmEwb2F1eTVZVVZNc3Q1SWRuczhRZzdMbjk1d0h5bDIwUTd5d2ZwaGQzeCsK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM4NzdBRTBBODJGQkJGRQpSV1QrdXkrbzRIcUhBMU1QOUtmMkxZTWtUOG8xaExEVnZDWWVsUmdIZ2x6N3EyeVVHWDdCZ21GVgo=",
       "endpoints": [
         "https://github.com/thierryvm/SynapseHub/releases/latest/download/latest.json"
       ]

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2-rc.1] - 2026-04-29
+
+### Fixed
+- **release pipeline** — `createUpdaterArtifacts: true` ajouté dans `tauri.conf.json` `bundle`. Sans cette option, Tauri 2 stable n'émet ni `latest.json` ni les `.sig` updater (régression silencieuse côté framework, opt-in explicite obligatoire). C'est ce qui a empêché l'auto-update à v0.1.1. Référence : [#17](https://github.com/thierryvm/SynapseHub/issues/17).
+
+### Changed
+- Nouvelle paire de clés minisign générée pour repartir sur une chaîne de signing dont le password (vide) est documenté. Pubkey rotée dans `tauri.conf.json` (fingerprint `3877AE0A82FBBFE`, vs précédent `BD5AA9E173A8A318`).
+
+### Validation
+- `v0.1.2-rc.1` est tagged d'abord pour valider le pipeline (présence de `latest.json` + `.sig` dans les assets de la release). `v0.1.2` stable suit uniquement si la rc passe le gate post-build.
+
 ## [0.1.1] - 2026-04-29
 
 ### Security
