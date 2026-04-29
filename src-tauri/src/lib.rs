@@ -144,9 +144,41 @@ fn load_or_create_secret() -> String {
     }
 
     let token = generate_token();
-    let _ = std::fs::write(&token_file, &token);
+    write_token_file(&token_file, &token);
     log::info!("Hook token generated ({} chars)", token.len());
     token
+}
+
+/// Writes the hook token with `0600` permissions on Unix so other users on
+/// shared machines cannot read it. On Windows we rely on the per-user ACL
+/// inherited from `%APPDATA%/synapsehub/`; explicit ACL hardening is tracked
+/// for v0.1.2.
+fn write_token_file(path: &std::path::Path, token: &str) {
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)
+        {
+            Ok(mut file) => {
+                if let Err(e) = file.write_all(token.as_bytes()) {
+                    log::warn!("Failed to write hook_token: {e}");
+                }
+            }
+            Err(e) => log::warn!("Failed to open hook_token for write: {e}"),
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        if let Err(e) = std::fs::write(path, token.as_bytes()) {
+            log::warn!("Failed to write hook_token: {e}");
+        }
+    }
 }
 
 /// Generates a cryptographically random 256-bit token, hex-encoded as 64 chars.
@@ -276,5 +308,23 @@ mod tests {
         assert!(!validate_token_format(&"a".repeat(33)));
         assert!(!validate_token_format(&"a".repeat(63)));
         assert!(!validate_token_format(&"a".repeat(128)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn creates_token_file_with_0600_perms() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("synapsehub-test-{}", generate_token()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("hook_token");
+
+        write_token_file(&path, "deadbeefcafebabedeadbeefcafebabe");
+
+        let meta = std::fs::metadata(&path).expect("token file written");
+        let mode = meta.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "expected 0o600, got {:o}", mode);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
