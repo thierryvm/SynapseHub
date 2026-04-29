@@ -29,6 +29,7 @@ use std::{
 };
 
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use subtle::ConstantTimeEq;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tokio::sync::Mutex;
@@ -43,9 +44,16 @@ struct HookState {
 }
 
 async fn handle_hook(State(hs): State<HookState>, Json(payload): Json<HookPayload>) -> StatusCode {
-    // Validate shared secret (constant-time comparison via subtle would be
-    // ideal; for a localhost-only server this is acceptable).
-    if payload.token != hs.secret {
+    // Constant-time comparison: ct_eq returns 0 if lengths differ or any byte
+    // differs, with no early exit, so a local attacker cannot recover the
+    // secret from response timing.
+    if payload
+        .token
+        .as_bytes()
+        .ct_eq(hs.secret.as_bytes())
+        .unwrap_u8()
+        != 1
+    {
         log::warn!("Hook received with invalid token — ignoring");
         return StatusCode::UNAUTHORIZED;
     }
