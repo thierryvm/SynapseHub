@@ -125,11 +125,26 @@ fn resolve_project_path(process: &sysinfo::Process) -> Option<String> {
 }
 
 /// Maps known process names or command-line signatures to a UI-facing agent name.
+///
+/// `cmd_joined` is expected to be lowercase already (the caller in
+/// `scan_processes` lowercases each cmd arg before joining).
 fn detect_ide_name(name_lower: &str, cmd_joined: &str) -> Option<&'static str> {
-    if cmd_joined.contains("claude-code")
+    // Claude Code Terminal CLI — multiple signatures across versions:
+    // - Pre-v2026: `node claude-code …`, `@anthropic-ai/…`, or `claude.cmd`
+    // - v2026 Windows: `claude --dangerously-skip-permissions -c` — bare
+    //   binary, no path prefix. Distinguished from Claude Desktop by the
+    //   absence of `\windowsapps\claude_` (which is what the desktop
+    //   Electron bundle carries on Windows).
+    let is_claude_code_legacy = cmd_joined.contains("claude-code")
         || cmd_joined.contains("@anthropic-ai")
-        || cmd_joined.contains("claude.cmd")
-    {
+        || cmd_joined.contains("claude.cmd");
+    let is_claude_terminal_v2026 = (cmd_joined == "claude"
+        || cmd_joined == "claude.exe"
+        || cmd_joined.starts_with("claude ")
+        || cmd_joined.starts_with("claude.exe ")
+        || cmd_joined.starts_with("\"claude\" "))
+        && !cmd_joined.contains("\\windowsapps\\claude_");
+    if is_claude_code_legacy || is_claude_terminal_v2026 {
         return Some("Claude Code Terminal");
     }
 
@@ -147,7 +162,15 @@ fn detect_ide_name(name_lower: &str, cmd_joined: &str) -> Option<&'static str> {
         Some("Cursor")
     } else if name_lower.contains("windsurf") {
         Some("Windsurf")
-    } else if name_lower.contains("claude.exe") || name_lower.contains("claude desktop") {
+    } else if name_lower.contains("claude desktop")
+        || cmd_joined.contains("\\windowsapps\\claude_")
+        || cmd_joined.contains("/applications/claude.app/")
+    {
+        // Claude Desktop is recognised by the Electron bundle path: the
+        // WindowsApps installer on Windows or the `.app` bundle on macOS.
+        // A bare `claude.exe` without one of those prefixes is the CLI
+        // and was already handled above; falling through here means we
+        // intentionally ignore it rather than mislabel it as Desktop.
         Some("Claude Desktop")
     } else if name_lower.contains("code") && name_lower != "node.exe" {
         Some("VSCode")
@@ -360,26 +383,41 @@ fn scan_processes(
 pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
     use sysinfo::{ProcessRefreshKind, RefreshKind, UpdateKind};
 
-    // Optimisation majeure du CPU : on informe sysinfo de ne scanner que le strict nécessaire
+    // CPU optimisation: only collect the fields we actually consume
+    // downstream (cpu / exe / cmd / cwd). `OnlyIfNotSet` means each field
+    // is read once per process and reused across polls until that process
+    // exits, so adding `cwd` here costs one PEB read per new process and
+    // nothing per refresh.
+    //
+    // `with_cwd` is mandatory: without it, sysinfo Windows leaves
+    // `process.cwd()` returning `None` for every process (cf. sysinfo
+    // 0.33.1 src/windows/process.rs:816 — `cwd_needs_update` short-circuits
+    // unless the refresh kind explicitly asks for it). That broke project
+    // path resolution for Claude Code Terminal CLI sessions whose cmd
+    // line carries no path argument to fall back on.
     let refresh_kind = RefreshKind::nothing().with_processes(
         ProcessRefreshKind::nothing()
             .with_cpu()
             .with_exe(UpdateKind::OnlyIfNotSet)
-            .with_cmd(UpdateKind::OnlyIfNotSet), // On ne demande ni la RAM ni le CPU de chaque process, ce qui est très lourd
+            .with_cmd(UpdateKind::OnlyIfNotSet)
+            .with_cwd(UpdateKind::OnlyIfNotSet),
     );
     let mut sys = System::new_with_specifics(refresh_kind);
     let mut start_times: HashMap<String, u64> = HashMap::new();
     let mut resume_votes: HashMap<String, u8> = HashMap::new();
 
     loop {
-        // Refresh uniquement ce qui est nécessaire très rapidement
+        // Keep the refresh shape in sync with the initial RefreshKind above
+        // — the same `with_cwd(...)` is required here for new processes
+        // discovered between polls.
         sys.refresh_processes_specifics(
             sysinfo::ProcessesToUpdate::All,
             true,
             ProcessRefreshKind::nothing()
                 .with_cpu()
                 .with_exe(UpdateKind::OnlyIfNotSet)
-                .with_cmd(UpdateKind::OnlyIfNotSet),
+                .with_cmd(UpdateKind::OnlyIfNotSet)
+                .with_cwd(UpdateKind::OnlyIfNotSet),
         );
 
         let waiting_since = {
@@ -554,6 +592,56 @@ mod tests {
                 "node claude-code --project F:\\\\PROJECTS\\\\Apps\\\\SynapseHub"
             ),
             Some("Claude Code Terminal")
+        );
+    }
+
+    #[test]
+    fn detects_claude_code_terminal_cli_v2026_windows() {
+        // Reproduces @thierry's smoke-test scenario on v0.1.2: bare
+        // `claude` invocation with the typical CC Terminal CLI flags,
+        // no path prefix, name = `claude.exe`.
+        assert_eq!(
+            detect_ide_name("claude.exe", "claude  --dangerously-skip-permissions -c"),
+            Some("Claude Code Terminal")
+        );
+    }
+
+    #[test]
+    fn detects_claude_code_terminal_cli_minimal() {
+        // Edge case: a shell where the user typed just `claude` with no
+        // arguments. We still want to surface it.
+        assert_eq!(
+            detect_ide_name("claude.exe", "claude"),
+            Some("Claude Code Terminal")
+        );
+    }
+
+    #[test]
+    fn does_not_misclassify_claude_desktop_as_terminal() {
+        // The desktop Electron app on Windows ships under a versioned
+        // WindowsApps directory. The cmd line carries the full path,
+        // which is the discriminator we use to keep it labelled as the
+        // Desktop app, not the CLI.
+        assert_eq!(
+            detect_ide_name(
+                "claude.exe",
+                r#""c:\program files\windowsapps\claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\claude.exe""#
+            ),
+            Some("Claude Desktop")
+        );
+    }
+
+    #[test]
+    fn does_not_misclassify_claude_desktop_subprocess_as_terminal() {
+        // Electron renderer / utility sub-processes inherit the same
+        // WindowsApps path prefix and add a `--type=…` flag. Same
+        // discrimination rule applies.
+        assert_eq!(
+            detect_ide_name(
+                "claude.exe",
+                r#""c:\program files\windowsapps\claude_1.5354.0.0_x64__pzs8sxrjxfjjc\app\claude.exe" --type=renderer"#
+            ),
+            Some("Claude Desktop")
         );
     }
 
