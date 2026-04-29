@@ -88,4 +88,9 @@ jobs:
 
       - name: cargo audit
         working-directory: src-tauri
-        run: cargo audit
+        # `--ignore` is passed inline because cargo-audit's auto-discovery of
+        # `audit.toml` is unreliable under GitHub Actions working-directory
+        # changes (the file is read on local invocation but skipped here).
+        # `src-tauri/audit.toml` remains the documented source of truth for
+        # ignored advisories — keep both in sync. Tracking removal: #13.
+        run: cargo audit --ignore RUSTSEC-2026-0097

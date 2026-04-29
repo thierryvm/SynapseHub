@@ -1,3 +1,13 @@
+# Source of truth for security advisories ignored by `cargo audit`.
+#
+# IMPORTANT — dual mechanism :
+#   - This file documents the rationale for any ignored advisory (visible to
+#     anyone reading the repo, surfaced in SECURITY.md).
+#   - The CI step in .github/workflows/ci.yml passes the same advisory ID via
+#     `cargo audit --ignore <ID>` because cargo-audit's auto-discovery of
+#     audit.toml is unreliable under GitHub Actions working-directory changes.
+#   - When updating one, update the other. Tracker: #13.
+
 [advisories]
 ignore = [
   # RUSTSEC-2026-0097 : rand 0.9.2 unsound with custom logger using rand::rng()
@@ -7,7 +17,7 @@ ignore = [
   #   2. tauri-plugin-notification utilise rand uniquement pour des IDs de notification,
   #      pas le pattern vulnérable (rand::rng() + custom logger qui rappelle dans rand)
   #   3. tauri-plugin-notification 2.3.3 = dernière version, pas de patch upstream dispo
-  # À retirer dès que tauri-plugin-notification bump rand → tracker GitHub issue (cf. ci-dessous)
+  # À retirer dès que tauri-plugin-notification bump rand → tracker GitHub issue #13
   # Re-vérifier à chaque release SynapseHub.
   "RUSTSEC-2026-0097",
 ]
