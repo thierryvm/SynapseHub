@@ -23,7 +23,7 @@ axum             = { version = "0.7", default-features = false, features = ["htt
 tower-http       = { version = "0.5", features = ["limit"] }
 sysinfo          = "0.33"
 dirs             = "5"
-git2             = { version = "0.19", default-features = false }
+git2             = { version = "0.20", default-features = false }
 log              = "0.4"
 env_logger       = "0.11"
 uuid             = { version = "1", features = ["v4"] }
