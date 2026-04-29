@@ -33,6 +33,9 @@ use subtle::ConstantTimeEq;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tokio::sync::Mutex;
+use tower_governor::{
+    governor::GovernorConfigBuilder, key_extractor::GlobalKeyExtractor, GovernorLayer,
+};
 
 use crate::types::{AppState, HookPayload, WaitingState};
 
@@ -102,8 +105,37 @@ pub async fn start_hook_server(state: Arc<Mutex<AppState>>, app: AppHandle, secr
         secret,
     };
 
+    // 10 requests/second, burst of 10. POST /hook is local-only and only used
+    // by Claude Code Stop hooks, so this is far above legitimate traffic and
+    // exists only to bound a flooding attacker who has the token.
+    // GlobalKeyExtractor: per-IP keying makes no sense on a loopback-only
+    // server (single 127.0.0.1 source); a global bucket is enough and avoids
+    // the ConnectInfo wiring that PeerIpKeyExtractor would require.
+    let governor_conf = Arc::new(
+        GovernorConfigBuilder::default()
+            .per_millisecond(100)
+            .burst_size(10)
+            .key_extractor(GlobalKeyExtractor)
+            .finish()
+            .expect("invalid governor configuration"),
+    );
+
+    // Periodically purge stale rate-limit state so a long-running session
+    // doesn't hold dead entries in memory.
+    let limiter = governor_conf.limiter().clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            limiter.retain_recent();
+        }
+    });
+
     let router = Router::new()
         .route("/hook", post(handle_hook))
+        .layer(GovernorLayer {
+            config: governor_conf,
+        })
         .with_state(hook_state);
 
     // Bind to a random available port on loopback only
