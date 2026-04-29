@@ -762,6 +762,13 @@ body {
 
 .code-block {
   max-height: clamp(180px, 26vh, 260px);
+  /* `pre-wrap` lets the curl + token snippet wrap naturally on narrow
+   * windows so users can see the whole thing without horizontal
+   * scrolling. `word-break: break-all` covers the edge case of an
+   * unbroken 64-char token; `overflow-x: auto` stays as a last-resort
+   * fallback for content that genuinely cannot wrap. */
+  white-space: pre-wrap;
+  word-break: break-all;
   overflow-x: auto;
   overflow-y: auto;
   padding: 14px;
