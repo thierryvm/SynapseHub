@@ -1,0 +1,56 @@
+# Source of truth for security advisories ignored by `cargo audit`.
+#
+# IMPORTANT — dual mechanism :
+#   - This file documents the rationale for any ignored advisory (visible to
+#     anyone reading the repo, surfaced in SECURITY.md).
+#   - The CI step in .github/workflows/ci.yml passes the same advisory IDs via
+#     `cargo audit --ignore <ID>` because cargo-audit's auto-discovery of
+#     audit.toml is unreliable under GitHub Actions working-directory changes.
+#   - When updating one, update the other. Trackers: #13, #14, #15.
+
+[advisories]
+ignore = [
+  # === rand 0.9.2 unsound (transitive via tauri-plugin-notification 2.3.3) ===
+  # Tracker: #13 — https://github.com/thierryvm/SynapseHub/issues/13
+  # Rationale:
+  #   1. SynapseHub uses OsRng + RngCore::fill_bytes (rand 0.8.5), NOT rand::rng()
+  #   2. tauri-plugin-notification uses rand only for notification IDs,
+  #      not the rand::rng() + custom logger pattern the advisory targets
+  #   3. tauri-plugin-notification 2.3.3 is the latest version — no upstream patch
+  "RUSTSEC-2026-0097",
+
+  # === GTK3 stack — Linux runtime, transitive via tauri-runtime-wry ===
+  # Tracker: #14 — https://github.com/thierryvm/SynapseHub/issues/14
+  # Rationale:
+  #   - All gtk-rs 0.18 crates are unmaintained as a family — no upstream
+  #     successor exists in the same major series
+  #   - Tauri 2 runs on this stack on Linux; bumping requires upstream
+  #     tauri-runtime-wry to migrate to GTK4 or an alternative backend
+  #   - Re-evaluate at each Tauri minor bump
+  "RUSTSEC-2024-0411", # gdkwayland-sys
+  "RUSTSEC-2024-0412", # gdk
+  "RUSTSEC-2024-0413", # atk
+  "RUSTSEC-2024-0414", # gdkx11-sys
+  "RUSTSEC-2024-0415", # gtk
+  "RUSTSEC-2024-0416", # atk-sys
+  "RUSTSEC-2024-0417", # gdkx11
+  "RUSTSEC-2024-0418", # gdk-sys
+  "RUSTSEC-2024-0419", # gtk3-macros
+  "RUSTSEC-2024-0420", # gtk-sys
+  "RUSTSEC-2024-0429", # glib (unsound — same upstream stack)
+
+  # === Compile-time transitive warnings — no runtime exposure ===
+  # Tracker: #15 — https://github.com/thierryvm/SynapseHub/issues/15
+  # Rationale:
+  #   - These crates run only at build time (proc macros, build helpers,
+  #     unicode tables consumed by build scripts)
+  #   - Not present in the SynapseHub binary distributed to end users
+  #   - Removed as soon as the upstream parent bumps off the unmaintained crate
+  "RUSTSEC-2024-0370", # proc-macro-error
+  "RUSTSEC-2025-0057", # fxhash
+  "RUSTSEC-2025-0075", # unic-char-range
+  "RUSTSEC-2025-0080", # unic-common
+  "RUSTSEC-2025-0081", # unic-char-property
+  "RUSTSEC-2025-0098", # unic-ucd-version
+  "RUSTSEC-2025-0100", # unic-ucd-ident
+]

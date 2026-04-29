@@ -23,11 +23,14 @@ axum             = { version = "0.7", default-features = false, features = ["htt
 tower-http       = { version = "0.5", features = ["limit"] }
 sysinfo          = "0.33"
 dirs             = "5"
-git2             = { version = "0.19", default-features = false }
+git2             = { version = "0.20", default-features = false }
 log              = "0.4"
 env_logger       = "0.11"
 uuid             = { version = "1", features = ["v4"] }
 rand             = "0.8"
+subtle           = "2"
+governor         = "0.6"
+tower_governor   = "0.4"
 
 # Windows-specific: focus window by PID
 [target.'cfg(target_os = "windows")'.dependencies]
@@ -36,6 +39,12 @@ windows-sys = { version = "0.59", features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_System_Threading",
 ] }
+
+[dev-dependencies]
+# `tower::util::ServiceExt::oneshot` for driving the axum Router in tests
+# without binding a TCP listener. The base `tower` crate is already pulled
+# transitively by axum / tower-http; we just enable the `util` feature here.
+tower = { version = "0.5", features = ["util"] }
 
 [profile.release]
 opt-level     = "s"

@@ -132,20 +132,69 @@ fn load_or_create_secret() -> String {
     let _ = std::fs::create_dir_all(&config_dir);
     let token_file = config_dir.join("hook_token");
 
-    if let Ok(token) = std::fs::read_to_string(&token_file) {
-        let token = token.trim().to_owned();
-        if !token.is_empty() {
-            return token;
+    if let Ok(existing) = std::fs::read_to_string(&token_file) {
+        let existing = existing.trim().to_owned();
+        if validate_token_format(&existing) {
+            log::info!("Hook token loaded ({} chars)", existing.len());
+            return existing;
+        }
+        if !existing.is_empty() {
+            log::warn!("Existing hook_token did not match expected format; regenerating");
         }
     }
 
-    // Generate a new 32-char hex token
-    let token: String = (0..32)
-        .map(|_| format!("{:x}", rand::random::<u8>()))
-        .collect();
-
-    let _ = std::fs::write(&token_file, &token);
+    let token = generate_token();
+    write_token_file(&token_file, &token);
+    log::info!("Hook token generated ({} chars)", token.len());
     token
+}
+
+/// Writes the hook token with `0600` permissions on Unix so other users on
+/// shared machines cannot read it. On Windows we rely on the per-user ACL
+/// inherited from `%APPDATA%/synapsehub/`; explicit ACL hardening is tracked
+/// for v0.1.2.
+fn write_token_file(path: &std::path::Path, token: &str) {
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)
+        {
+            Ok(mut file) => {
+                if let Err(e) = file.write_all(token.as_bytes()) {
+                    log::warn!("Failed to write hook_token: {e}");
+                }
+            }
+            Err(e) => log::warn!("Failed to open hook_token for write: {e}"),
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        if let Err(e) = std::fs::write(path, token.as_bytes()) {
+            log::warn!("Failed to write hook_token: {e}");
+        }
+    }
+}
+
+/// Generates a cryptographically random 256-bit token, hex-encoded as 64 chars.
+fn generate_token() -> String {
+    use rand::rngs::OsRng;
+    use rand::RngCore;
+    let mut bytes = [0u8; 32];
+    OsRng.fill_bytes(&mut bytes);
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+/// Accepts the legacy 32-char hex tokens (pre-v0.1.1) and the new 64-char hex
+/// tokens. Both must be ASCII hex; everything else is rejected so a corrupted
+/// or truncated file triggers regeneration on next launch.
+fn validate_token_format(token: &str) -> bool {
+    matches!(token.len(), 32 | 64) && token.chars().all(|c| c.is_ascii_hexdigit())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -197,4 +246,85 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("Error running SynapseHub");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generates_64_hex_chars_token() {
+        for _ in 0..10 {
+            let token = generate_token();
+            assert_eq!(
+                token.len(),
+                64,
+                "token should be 64 hex chars (256 bits), got {}",
+                token.len()
+            );
+            assert!(
+                token.chars().all(|c| c.is_ascii_hexdigit()),
+                "token should be hex-only: {token}"
+            );
+        }
+    }
+
+    #[test]
+    fn entropy_check_token_unique_across_runs() {
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..100 {
+            assert!(
+                seen.insert(generate_token()),
+                "OsRng produced a duplicate within 100 draws — entropy is broken"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_token_accepts_legacy_32_chars() {
+        let legacy = "0123456789abcdef0123456789abcdef";
+        assert_eq!(legacy.len(), 32);
+        assert!(validate_token_format(legacy));
+    }
+
+    #[test]
+    fn validate_token_accepts_new_64_chars() {
+        let token = generate_token();
+        assert!(validate_token_format(&token));
+    }
+
+    #[test]
+    fn validate_token_rejects_non_hex_chars() {
+        // 'g' is not a hex digit
+        let bad = "0123456789abcdef0123456789abcdeg";
+        assert_eq!(bad.len(), 32);
+        assert!(!validate_token_format(bad));
+    }
+
+    #[test]
+    fn validate_token_rejects_wrong_length() {
+        assert!(!validate_token_format(""));
+        assert!(!validate_token_format("a"));
+        assert!(!validate_token_format(&"a".repeat(33)));
+        assert!(!validate_token_format(&"a".repeat(63)));
+        assert!(!validate_token_format(&"a".repeat(128)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn creates_token_file_with_0600_perms() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("synapsehub-test-{}", generate_token()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let path = dir.join("hook_token");
+
+        write_token_file(&path, "deadbeefcafebabedeadbeefcafebabe");
+
+        let meta = std::fs::metadata(&path).expect("token file written");
+        let mode = meta.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "expected 0o600, got {:o}", mode);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
