@@ -7,10 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.5] - 2026-04-30
+## [0.2.0] - 2026-04-30
+
+### Changed
+- **UX/UI rework global** ([#30](https://github.com/thierryvm/SynapseHub/issues/30)) — refonte visuelle complète intégrée depuis le livrable Claude Design (claude.ai/design). Direction validée @thierry : Dark-first / hybride moderne / **cyan néon HUD subtil** (cohérent icône systray) / **Inter Display + JetBrains Mono Variable** / 4 piliers UX (adaptive density, responsive, settings drawer JSON, onboarding guide).
+- **Design tokens centralisés** dans `src/styles/tokens.css` (palette OKLCH dark + variant `[data-theme="light"]`, typographie, spacing 4px-base, radius, shadows, focus ring HUD, motion durations, layout, density modes). 9 fichiers de composants modulaires sous `src/styles/components/` (header, stats, toolbar, session-card, drawer, empty, onboarding, toast, footer).
+- **Session card status-led** — border-left coloré + dot animé selon `data-status` (running mint / waiting amber / stopped neutre / error rouge). Glyphe IDE monochrome 2-lettres (CC, CD, CR, CX, AG, WS, VS, AI, CL, OH) avec teinte par IDE, runtime pill mono-format. Hover révèle les actions, click reste cliquable partout sur la carte.
+- **Settings drawer** (remplace l'ancienne modal v0.1.x) — slide-in droit, JSON config syntax-highlighted (token classes `.tk-key`, `.tk-str`, `.tk-num`, `.tk-bool`, `.tk-null`, `.tk-punct`), bouton **Copier** avec feedback visuel ✓ + état `data-state="copied"` 1.8s. Section update intégrée (check + install). Fermeture par clic backdrop, croix, ou `Escape`.
+- **Adaptive density** — `data-density="confortable"` (défaut) ↔ `data-density="compact"` (auto > 10 sessions actives). Tokens density-aware (`--row-h`, `--row-pad-y`, `--row-pad-x`, `--row-gap`, `--card-pad`, `--stack-gap`).
+- **Responsive** via CSS Container Queries — breakpoints 320 / 380 / 480 / 800 / 1200px+ sur header, stats, session-list, drawer, footer, onboarding. Adaptation graceful (tagline cachée < 480px, status label caché < 480px, drawer pleine largeur < 480px).
+- **Empty state guidant** — illustration animée + 1-2-3 steps (ouvrir un terminal IA / configurer le hook / cliquer une carte pour focus). Remplace l'ancien empty state minimal.
+- **Footer status bar** — daemon dot, session count avec icône CPU, footer detail dynamique, lien guide (`btn-show-onboarding`), version.
+- **Header** — brand mark + tagline "Multi-agent orchestration desk" + privacy chip "100% local · zéro télémétrie" + active badge HUD avec dot pulsant + window controls (settings / minimize / close).
+- **`focus_window` Tauri command** — la commande retourne `bool` depuis v0.1.4 ; le frontend log explicitement en console quand `focus_window` retourne `false` (terminal fermé).
+
+### Added
+- **Onboarding modal 3 slides** au premier lancement (Détection / Hook / Focus). Persistance via `localStorage.synapsehub_onboarding_completed_v0.2.0`. Re-accessible via le bouton "Guide" dans le footer. Bouton `Skip` pour fermer immédiatement, `Précédent` / `Suivant → Terminer` pour naviguer, dots indicateurs.
+- **CSP corrigé** dans `index.html` : `connect-src 'self' ipc: http://ipc.localhost https://fonts.googleapis.com https://fonts.gstatic.com` + `font-src 'self' https://fonts.gstatic.com`. Fixe le bug v0.1.x où l'IPC Tauri faisait un fallback `postMessage` (lossy) faute de `connect-src` explicite.
 
 ### Fixed
-- **One-click focus visible** — auto-hide du dashboard SynapseHub après un focus IDE réussi. Diagnostic complet via console DevTools v0.1.4 (interceptor `__TAURI_INTERNALS__.invoke`, `getEventListeners`, body-capture) : le pipe complet (listener click → invoke → Rust `focus_window` → parent chain walk → `SetForegroundWindow`) marche, Windows passe bien le focus clavier sur Windows Terminal (Alt+Tab confirme), MAIS la dashboard reste visuellement par-dessus à cause de `alwaysOnTop: true` configuré pour le pattern "tray companion". Fix : appel à `invoke("hide_window")` quand `focus_window` retourne `true`. Le user rouvre SynapseHub via l'icône systray (workflow naturel : click "focus IDE" = je veux voir l'IDE, pas garder SynapseHub par-dessus). Si `focus_window` retourne `false` (process orphelin / terminal fermé), on ne hide pas et on log un `console.warn` explicite — l'utilisateur garde la visibilité du dashboard pour comprendre.
+- **Auto-hide après focus IDE** ([#28](https://github.com/thierryvm/SynapseHub/issues/28)) — porte le fix v0.1.5 dans la nouvelle architecture. Quand l'utilisateur clique une session card et que `focus_window` retourne `true`, SynapseHub se masque automatiquement (`hide_window`) pour laisser place à la fenêtre IDE. La dashboard `alwaysOnTop: true` masquait sinon visuellement le terminal qui avait pourtant le focus clavier.
+
+### Removed
+- **DevTools en build release** — désactivés par défaut. Précédemment activés temporairement en v0.1.4 pour le diagnostic du bug focus, ils sont maintenant gated derrière la feature Cargo `debug-devtools` (`cargo tauri build --features debug-devtools`). En prod, la WebView inspector n'est plus compilée dans le binaire.
+- **Ancien hero panel + orbites animées** — remplacés par le nouveau header + stats grid plus dense.
+- **Ancien settings modal** — remplacé par le drawer slide-in.
+
+### Tests
+- Tests Rust : 43/43 inchangés (régression-zéro sur watcher, focus, hooks).
+- Tests Vitest : 7/7 inchangés (`session-view.ts` augmenté avec `getStatusDataAttr`, `getStatusLabelShort`, `ideKey`, `ideGlyph` — les utilitaires legacy `summarizeSessions`, `getStatusKey`, etc. restent exportés pour la compat tests).
+- Build vite : 14 KB HTML, 35 KB CSS (7 KB gzip), 20 KB JS (7.2 KB gzip).
+- `cargo build --features debug-devtools` valide la feature flag opt-in.
 
 ## [0.1.4] - 2026-04-30
 

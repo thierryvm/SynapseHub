@@ -1,193 +1,266 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<!doctype html>
+<html lang="fr" data-theme="dark" data-density="confortable">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset:; connect-src ipc: http://ipc.localhost"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: asset:; connect-src ipc: http://ipc.localhost https://fonts.googleapis.com https://fonts.gstatic.com"
     />
     <title>SynapseHub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div id="app">
-      <div class="app-shell">
-        <header class="header">
-          <div class="header-brand">
-            <svg class="logo-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="3" fill="currentColor" opacity="0.9" />
-              <circle cx="4" cy="6" r="2" fill="currentColor" opacity="0.55" />
-              <circle cx="20" cy="6" r="2" fill="currentColor" opacity="0.55" />
-              <circle cx="4" cy="18" r="2" fill="currentColor" opacity="0.55" />
-              <circle cx="20" cy="18" r="2" fill="currentColor" opacity="0.55" />
-              <line x1="12" y1="12" x2="4" y2="6" stroke="currentColor" stroke-width="1.2" opacity="0.32" />
-              <line x1="12" y1="12" x2="20" y2="6" stroke="currentColor" stroke-width="1.2" opacity="0.32" />
-              <line x1="12" y1="12" x2="4" y2="18" stroke="currentColor" stroke-width="1.2" opacity="0.32" />
-              <line x1="12" y1="12" x2="20" y2="18" stroke="currentColor" stroke-width="1.2" opacity="0.32" />
+    <div class="app-shell" id="app-shell">
+      <!-- ─────── Header ─────── -->
+      <header class="app-header" id="app-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="16" cy="16" r="3.2" fill="currentColor" />
+              <circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="1.2" stroke-opacity="0.5" />
+              <line x1="16" y1="16" x2="5" y2="5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <line x1="16" y1="16" x2="27" y2="5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <line x1="16" y1="16" x2="5" y2="27" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <line x1="16" y1="16" x2="27" y2="27" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              <circle cx="5" cy="5" r="2" fill="currentColor" />
+              <circle cx="27" cy="5" r="2" fill="currentColor" />
+              <circle cx="5" cy="27" r="2" fill="currentColor" />
+              <circle cx="27" cy="27" r="2" fill="currentColor" />
             </svg>
-            <div class="brand-copy">
-              <span class="logo-text">SynapseHub</span>
-              <span class="logo-subtext">Centre de pilotage IA</span>
-            </div>
-          </div>
-          <div class="header-meta">
-            <span class="agent-badge" id="agent-badge">—</span>
-            <button class="icon-btn" id="btn-settings" title="Paramètres" aria-label="Paramètres">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-            </button>
-            <button class="icon-btn" id="btn-minimize" title="Réduire" aria-label="Réduire">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-              </svg>
-            </button>
-            <button class="icon-btn" id="btn-close" title="Fermer" aria-label="Fermer">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-              </svg>
-            </button>
-          </div>
-        </header>
-
-        <div class="dashboard-scroll">
-          <section class="hero-panel">
-            <div class="hero-copy">
-              <p class="hero-kicker" id="hero-kicker">Surveillance locale</p>
-              <h1 class="hero-title" id="hero-title">Prêt à suivre vos agents</h1>
-              <p class="hero-subtitle" id="hero-subtitle">
-                SynapseHub surveille vos sessions Claude Code, Cursor et Antigravity en temps réel.
-              </p>
-            </div>
-            <div class="hero-orbit" aria-hidden="true">
-              <div class="orbit-core"></div>
-              <div class="orbit-ring orbit-ring--one"></div>
-              <div class="orbit-ring orbit-ring--two"></div>
-            </div>
-          </section>
-
-          <section class="stats-grid" aria-label="Résumé d'activité">
-            <article class="stat-card stat-card--running">
-              <span class="stat-label">En cours</span>
-              <strong class="stat-value" id="running-count">0</strong>
-              <span class="stat-meta" id="running-meta">Aucune session active</span>
-            </article>
-            <article class="stat-card stat-card--waiting">
-              <span class="stat-label">En attente</span>
-              <strong class="stat-value" id="waiting-count">0</strong>
-              <span class="stat-meta" id="waiting-meta">Aucun blocage détecté</span>
-            </article>
-            <article class="stat-card stat-card--focus">
-              <span class="stat-label">Projets suivis</span>
-              <strong class="stat-value" id="projects-count">0</strong>
-              <span class="stat-meta" id="projects-meta">Vos dossiers récents</span>
-            </article>
-          </section>
-
-          <section class="section-heading">
-            <div>
-              <p class="section-kicker">Flux live</p>
-              <h2 class="section-title">Sessions détectées</h2>
-            </div>
-            <span class="section-count" id="section-count">0 actives</span>
-          </section>
-
-          <main class="agent-list" id="agent-list">
-            <div class="empty-state" id="empty-state">
-              <div class="empty-orbit" aria-hidden="true">
-                <div class="empty-orbit__core"></div>
-                <div class="empty-orbit__ring"></div>
-              </div>
-              <p class="empty-title">Le hub est calme pour l’instant</p>
-              <p class="empty-sub">
-                Lancez Claude Code, Cursor ou Antigravity sur un projet pour remplir automatiquement le tableau de bord.
-              </p>
-            </div>
-          </main>
+          </span>
+          <span class="brand-name">SynapseHub</span>
         </div>
+        <span class="brand-tagline">Multi-agent orchestration desk</span>
+        <div class="header-spacer"></div>
+        <span class="privacy-chip" title="100% local · zéro télémétrie">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 1.5l5.5 2v4c0 3.5-2.5 6-5.5 7-3-1-5.5-3.5-5.5-7v-4l5.5-2z" />
+            <path d="M5.8 8L7.5 9.7l3-3.4" />
+          </svg>
+          <span>100% local</span>
+        </span>
+        <span class="header-active-badge" id="agent-badge" title="Sessions actives">
+          <span class="dot"></span>
+          <strong id="agent-badge-count">0</strong>
+          <span class="label-text">actives</span>
+        </span>
+        <div class="window-controls" role="group" aria-label="Contrôles de fenêtre">
+          <button class="win-btn" id="btn-settings" aria-label="Paramètres" title="Paramètres">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="8" cy="8" r="2" />
+              <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3" />
+            </svg>
+          </button>
+          <button class="win-btn" id="btn-minimize" data-action="minimize" aria-label="Réduire">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+              <path d="M3 8h10" />
+            </svg>
+          </button>
+          <button class="win-btn" id="btn-close" data-action="close" aria-label="Fermer">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+              <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+            </svg>
+          </button>
+        </div>
+      </header>
 
-        <footer class="footer">
-          <div class="footer-status" id="footer-status">
-            <span class="status-dot status-dot--ok"></span>
-            <div>
-              <div class="footer-text">Surveillance active</div>
-              <div class="footer-subtext" id="footer-detail">Aucun agent critique</div>
-            </div>
-          </div>
-          <span class="version-label" id="version-label">v0.1.0</span>
-        </footer>
-      </div>
-
-      <div id="settings-modal" class="modal-overlay" style="display: none;">
-        <div class="bottom-sheet">
-          <div class="sheet-drag-handle"></div>
-          <div class="modal-header">
-            <div>
-              <p class="section-kicker">Configuration</p>
-              <h2>Guide & Paramètres</h2>
-            </div>
-            <button class="icon-btn" id="btn-close-settings" title="Fermer" aria-label="Fermer les paramètres">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <!-- ─────── Main ─────── -->
+      <main class="app-main" id="app-main">
+        <section class="stats-grid" aria-label="Résumé d'activité">
+          <article class="stat-card" data-tone="active">
+            <div class="stat-label">
+              <svg class="stat-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 1.5L3 9h4l-1 5.5L13 7H9l1-5.5z" />
               </svg>
-            </button>
-          </div>
-
-            <div class="modal-body">
-              <div class="guide-grid">
-                <section class="guide-card">
-                  <p class="guide-index">01</p>
-                <h3>Détection instantanée</h3>
-                <p class="modal-text">
-                  Claude Code Terminal, Cursor, Windsurf, Antigravity et VS Code sont détectés automatiquement dès qu’un projet est ouvert.
-                </p>
-              </section>
-              <section class="guide-card">
-                <p class="guide-index">02</p>
-                <h3>Mode “En attente”</h3>
-                <p class="modal-text">
-                  Activez le hook local ci-dessous pour remonter les pauses d’interaction de Claude Code sans exposer le token dans les logs.
-                </p>
-                <p class="modal-text doc-paths">
-                  Choisissez l’emplacement selon votre usage :<br>
-                  <strong>User-level</strong> (tous projets) : <code>~/.claude/settings.json</code><br>
-                  <strong>Project-level</strong> (un seul projet) : <code>&lt;project&gt;/.claude/settings.json</code>
-                </p>
-              </section>
+              <span>En cours</span>
             </div>
+            <div class="stat-value">
+              <span id="running-count">0</span><span class="stat-suffix" id="running-suffix"></span>
+            </div>
+            <div class="stat-meta"><span class="delta" id="running-meta">Aucune session active</span></div>
+          </article>
+          <article class="stat-card" data-tone="waiting">
+            <div class="stat-label">
+              <svg class="stat-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3.5 12h9l-1-1.5V7.5a3.5 3.5 0 1 0-7 0v3L3.5 12z" />
+                <path d="M6.5 13.5a1.5 1.5 0 0 0 3 0" />
+              </svg>
+              <span>En attente</span>
+            </div>
+            <div class="stat-value"><span id="waiting-count">0</span></div>
+            <div class="stat-meta"><span class="delta" id="waiting-meta">Aucun blocage détecté</span></div>
+          </article>
+          <article class="stat-card" data-tone="projects">
+            <div class="stat-label">
+              <svg class="stat-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 4.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4.5z" />
+              </svg>
+              <span>Projets suivis</span>
+            </div>
+            <div class="stat-value"><span id="projects-count">0</span></div>
+            <div class="stat-meta"><span class="delta" id="projects-meta">Vos dossiers récents</span></div>
+          </article>
+        </section>
 
-            <section class="update-card" aria-labelledby="update-title">
-              <div class="update-copy">
-                <p class="guide-index">03</p>
-                <h3 id="update-title">Mises à jour continues</h3>
-                <p class="modal-text" id="update-summary">
-                  SynapseHub vérifie les nouvelles versions en arrière-plan et peut les installer sans réinstallation manuelle.
-                </p>
-                <p class="update-meta" id="update-meta">
-                  Une release GitHub signée et publiée suffit ensuite pour distribuer la prochaine version.
-                </p>
+        <section class="session-list" id="session-list" aria-label="Sessions détectées">
+          <div class="empty-state" id="empty-state">
+            <div class="empty-illus" aria-hidden="true">
+              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="16" cy="16" r="3.2" fill="currentColor" />
+                <circle cx="16" cy="16" r="6" stroke="currentColor" stroke-width="1" stroke-opacity="0.4" />
+                <circle cx="16" cy="16" r="10" stroke="currentColor" stroke-width="0.8" stroke-opacity="0.25" />
+                <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="0.6" stroke-opacity="0.15" />
+              </svg>
+            </div>
+            <h2 class="empty-title">Aucune session active</h2>
+            <p class="empty-subtitle">
+              Lancez Claude Code, Cursor, Antigravity, Codex ou VS Code dans un projet et SynapseHub remontera automatiquement la session ici.
+            </p>
+            <div class="empty-steps">
+              <div class="step-row">
+                <span class="step-num">1</span>
+                <div>
+                  <p class="step-title">Ouvrez un terminal IA</p>
+                  <p class="step-desc">claude, cursor, codex…</p>
+                </div>
               </div>
-              <div class="update-actions">
-                <button class="btn-secondary" id="btn-check-updates">Rechercher</button>
-                <button class="btn-primary" id="btn-install-update" style="display: none;">Installer</button>
+              <div class="step-row">
+                <span class="step-num">2</span>
+                <div>
+                  <p class="step-title">Configurez le hook (optionnel)</p>
+                  <p class="step-desc">Ouvrez les paramètres pour copier le snippet `settings.json`.</p>
+                </div>
               </div>
-              <span class="modal-status update-progress" id="update-progress" role="status" aria-live="polite"></span>
-            </section>
-
-            <div class="code-block-wrapper">
-              <div class="code-block-header">
-                <span>Configuration `settings.json`</span>
-                <button class="btn-primary" id="btn-copy-config">Copier</button>
+              <div class="step-row">
+                <span class="step-num">3</span>
+                <div>
+                  <p class="step-title">Cliquez une carte pour focus</p>
+                  <p class="step-desc">SynapseHub se cache automatiquement.</p>
+                </div>
               </div>
-              <pre class="code-block"><code id="config-code">Chargement...</code></pre>
-              <span class="modal-status" id="modal-status" role="status" aria-live="polite"></span>
             </div>
           </div>
+        </section>
+      </main>
+
+      <!-- ─────── Footer ─────── -->
+      <footer class="app-footer" role="contentinfo">
+        <span class="footer-item"><span class="dot"></span>daemon · OK</span>
+        <span class="footer-divider"></span>
+        <span class="footer-item">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="4" width="8" height="8" rx="1" />
+            <rect x="6" y="6" width="4" height="4" rx="0.5" />
+            <path d="M7 1v2M9 1v2M7 13v2M9 13v2M1 7h2M1 9h2M13 7h2M13 9h2" />
+          </svg>
+          <span id="footer-session-count">0 session</span>
+        </span>
+        <span class="footer-divider optional"></span>
+        <span class="footer-item optional" id="footer-detail">Aucun agent critique</span>
+        <span class="footer-spacer"></span>
+        <button class="footer-link optional" id="btn-show-onboarding" type="button" title="Revoir le guide">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="6" />
+            <path d="M8 11.5h.01M7 6.5a1 1 0 1 1 1.5.87c-.3.18-.5.45-.5.78V9" />
+          </svg>
+          Guide
+        </button>
+        <span class="footer-version" id="version-label">v0.2.0</span>
+      </footer>
+    </div>
+
+    <!-- ─────── Settings drawer ─────── -->
+    <div class="drawer-backdrop" id="drawer-backdrop" data-open="false"></div>
+    <aside class="drawer" id="settings-drawer" data-open="false" aria-hidden="true" aria-labelledby="drawer-title">
+      <header class="drawer-header">
+        <h2 class="drawer-title" id="drawer-title">Paramètres</h2>
+        <button class="drawer-close" id="btn-close-drawer" aria-label="Fermer les paramètres">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+            <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="drawer-body">
+        <section class="setting-group">
+          <h3 class="setting-group-title">Hook Claude Code</h3>
+          <p class="setting-help">
+            Collez ce snippet dans <code>~/.claude/settings.json</code> (user-level) ou <code>&lt;project&gt;/.claude/settings.json</code> (project-level) pour relayer les pauses d'interaction au dashboard.
+          </p>
+          <div class="json-viewer">
+            <div class="json-viewer-header">
+              <span class="file">settings.json</span>
+              <span class="spacer"></span>
+              <button class="copy-btn" id="btn-copy-config" type="button">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="5" y="5" width="9" height="9" rx="1.2" />
+                  <path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2" />
+                </svg>
+                Copier
+              </button>
+            </div>
+            <pre><code id="config-code">Chargement…</code></pre>
+          </div>
+          <p class="setting-help" id="modal-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="setting-group">
+          <h3 class="setting-group-title">Mises à jour</h3>
+          <p class="setting-help" id="update-summary">
+            SynapseHub vérifie les nouvelles versions en arrière-plan et peut les installer sans réinstallation manuelle.
+          </p>
+          <p class="setting-help" id="update-meta">
+            Une release GitHub signée et publiée suffit ensuite pour distribuer la prochaine version.
+          </p>
+          <p class="setting-help" id="update-progress" role="status" aria-live="polite"></p>
+          <div class="setting-row">
+            <span class="setting-label">Vérifier maintenant</span>
+            <button class="btn btn-secondary" id="btn-check-updates" type="button">Rechercher</button>
+          </div>
+          <div class="setting-row" id="install-row" style="display: none;">
+            <span class="setting-label">Installer la mise à jour</span>
+            <button class="btn btn-primary" id="btn-install-update" type="button">Installer</button>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <!-- ─────── Onboarding modal ─────── -->
+    <div class="onboard-backdrop is-hidden" id="onboarding-backdrop" role="dialog" aria-modal="true" aria-labelledby="onboard-title">
+      <div class="onboard">
+        <div class="onboard-visual">
+          <div class="onboard-glyph" id="onboard-glyph" aria-hidden="true"></div>
+        </div>
+        <div class="onboard-content">
+          <p class="onboard-eyebrow" id="onboard-eyebrow">Étape 1 / 3</p>
+          <h2 class="onboard-title" id="onboard-title">Surveillance locale, zéro telemétrie</h2>
+          <p class="onboard-body" id="onboard-body">
+            SynapseHub détecte vos sessions Claude Code, Cursor, Antigravity, Codex et VS Code en local. Les données ne quittent jamais votre machine.
+          </p>
+        </div>
+        <div class="onboard-footer">
+          <div class="onboard-dots" id="onboard-dots">
+            <span class="onboard-dot" data-active="true"></span>
+            <span class="onboard-dot"></span>
+            <span class="onboard-dot"></span>
+          </div>
+          <span class="onboard-spacer"></span>
+          <button class="btn btn-ghost" id="onboard-skip" type="button">Passer</button>
+          <button class="btn btn-secondary" id="onboard-prev" type="button" style="visibility: hidden;">Précédent</button>
+          <button class="btn btn-primary" id="onboard-next" type="button">Suivant →</button>
         </div>
       </div>
     </div>
+
+    <!-- Toast region -->
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="false"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

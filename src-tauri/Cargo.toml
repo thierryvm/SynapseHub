@@ -1,6 +1,6 @@
 [package]
 name = "synapsehub"
-version = "0.1.5"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.80"
 
@@ -8,11 +8,18 @@ rust-version = "1.80"
 name = "synapsehub_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = []
+# Opt-in flag to ship a build with the WebView inspector (`Ctrl+Shift+I`).
+# Was enabled by default in v0.1.4 (temporarily, for the focus diagnostic);
+# v0.2.0 makes it opt-in again. Build with: `cargo tauri build --features debug-devtools`.
+debug-devtools = ["tauri/devtools"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri            = { version = "2", features = ["tray-icon", "image-png", "devtools"] }
+tauri            = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-notification = "2"
 tauri-plugin-updater      = "2"
 tauri-plugin-process      = "2"
