@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-30
+
+### Fixed
+- **One-click focus visible** — auto-hide du dashboard SynapseHub après un focus IDE réussi. Diagnostic complet via console DevTools v0.1.4 (interceptor `__TAURI_INTERNALS__.invoke`, `getEventListeners`, body-capture) : le pipe complet (listener click → invoke → Rust `focus_window` → parent chain walk → `SetForegroundWindow`) marche, Windows passe bien le focus clavier sur Windows Terminal (Alt+Tab confirme), MAIS la dashboard reste visuellement par-dessus à cause de `alwaysOnTop: true` configuré pour le pattern "tray companion". Fix : appel à `invoke("hide_window")` quand `focus_window` retourne `true`. Le user rouvre SynapseHub via l'icône systray (workflow naturel : click "focus IDE" = je veux voir l'IDE, pas garder SynapseHub par-dessus). Si `focus_window` retourne `false` (process orphelin / terminal fermé), on ne hide pas et on log un `console.warn` explicite — l'utilisateur garde la visibilité du dashboard pour comprendre.
+
 ## [0.1.4] - 2026-04-30
 
 ### Fixed
