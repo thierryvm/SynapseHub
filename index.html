@@ -141,8 +141,8 @@
               <div class="step-row">
                 <span class="step-num">3</span>
                 <div>
-                  <p class="step-title">Cliquez une carte pour focus</p>
-                  <p class="step-desc">SynapseHub se cache automatiquement.</p>
+                  <p class="step-title">Cliquez la flèche d'une carte</p>
+                  <p class="step-desc">Focus l'IDE, garde SynapseHub visible derrière.</p>
                 </div>
               </div>
             </div>
@@ -189,6 +189,23 @@
       </header>
 
       <div class="drawer-body">
+        <section class="setting-group">
+          <h3 class="setting-group-title">Comportement de la fenêtre</h3>
+          <div class="setting-row">
+            <span class="setting-label">Toujours au premier plan</span>
+            <button
+              class="toggle"
+              id="btn-toggle-always-on-top"
+              type="button"
+              aria-pressed="false"
+              aria-label="Activer ou désactiver le mode toujours au premier plan"
+            ></button>
+            <p class="setting-help">
+              Garde SynapseHub par-dessus toutes les autres fenêtres. Désactivé par défaut pour ne pas bloquer le focus de l'IDE après un click flèche.
+            </p>
+          </div>
+        </section>
+
         <section class="setting-group">
           <h3 class="setting-group-title">Hook Claude Code</h3>
           <p class="setting-help">
