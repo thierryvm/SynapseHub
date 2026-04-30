@@ -320,7 +320,14 @@ function renderCard(session: AgentSession): HTMLElement {
     if (canFocusWindow) {
       invoke<boolean>("focus_window", { pid: session.pid })
         .then((focused) => {
-          if (!focused) {
+          if (focused) {
+            // The dashboard window has `alwaysOnTop: true`, so even though
+            // SetForegroundWindow succeeds on the IDE, SynapseHub still
+            // visually covers it. Hide ourselves so the IDE actually
+            // becomes the visible window. The user re-opens SynapseHub
+            // through the tray icon when they need it back.
+            invoke("hide_window").catch(console.error);
+          } else {
             console.warn(
               `focus_window(${session.pid}) → no window found in parent chain (terminal may have closed)`,
             );
