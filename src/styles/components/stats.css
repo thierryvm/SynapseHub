@@ -1,0 +1,118 @@
+/* ============================================================
+   Stats Cards — EN COURS / EN ATTENTE / PROJETS SUIVIS
+   ============================================================ */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  container-type: inline-size;
+  container-name: stats;
+}
+
+@container main (max-width: 799px) {
+  .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); padding: var(--sp-3); }
+}
+@container main (max-width: 479px) {
+  .stats-grid { grid-template-columns: 1fr; }
+}
+
+.stat-card {
+  position: relative;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  padding: var(--card-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 86px;
+  overflow: hidden;
+  transition: border-color var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  opacity: 0.25;
+  color: var(--text-3);
+}
+
+.stat-card[data-tone="active"] { color: var(--status-running); }
+.stat-card[data-tone="active"]::before { opacity: 0.5; }
+.stat-card[data-tone="waiting"] { color: var(--status-waiting); }
+.stat-card[data-tone="waiting"]::before { opacity: 0.5; }
+.stat-card[data-tone="projects"] { color: var(--accent-500); }
+.stat-card[data-tone="projects"]::before { opacity: 0.5; }
+
+.stat-card:hover {
+  border-color: var(--border-2);
+  transform: translateY(-1px);
+}
+
+.stat-label {
+  font-size: var(--fs-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.stat-label .stat-icon {
+  width: 14px; height: 14px;
+  color: currentColor;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: var(--fs-28);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-mono);
+  line-height: 1;
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.stat-card[data-tone="active"] .stat-value,
+.stat-card[data-tone="waiting"] .stat-value,
+.stat-card[data-tone="projects"] .stat-value {
+  color: currentColor;
+  text-shadow: 0 0 18px currentColor;
+}
+
+.stat-suffix {
+  font-family: var(--font-sans);
+  font-size: var(--fs-11);
+  color: var(--text-3);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--tracking-normal);
+}
+
+.stat-meta {
+  font-size: var(--fs-11);
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: auto;
+}
+
+.stat-meta .delta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  color: var(--text-2);
+}
+
+/* Compact density: shrink stat */
+[data-density="compact"] .stat-card { min-height: 60px; padding: var(--sp-3); }
+[data-density="compact"] .stat-value { font-size: var(--fs-22); }

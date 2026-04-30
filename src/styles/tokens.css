@@ -1,0 +1,201 @@
+/* ============================================================
+   SynapseHub v0.2.0 — Design Tokens
+   Single source of truth. Override via [data-theme] or container.
+   ============================================================ */
+
+:root {
+  /* ---------- Color: Surface (dark-first) ---------- */
+  --surface-0: oklch(0.16 0.018 240);   /* app bg, deepest */
+  --surface-1: oklch(0.19 0.020 240);   /* panels */
+  --surface-2: oklch(0.22 0.022 240);   /* cards */
+  --surface-3: oklch(0.26 0.024 240);   /* elevated / hover */
+  --surface-4: oklch(0.30 0.026 240);   /* pressed / active */
+
+  /* ---------- Color: Text ---------- */
+  --text-1: oklch(0.97 0.005 240);      /* primary */
+  --text-2: oklch(0.78 0.012 240);      /* secondary */
+  --text-3: oklch(0.60 0.014 240);      /* tertiary / labels */
+  --text-4: oklch(0.46 0.014 240);      /* disabled / hints */
+  --text-inverse: oklch(0.14 0.018 240);
+
+  /* ---------- Color: Borders ---------- */
+  --border-1: oklch(0.30 0.020 240 / 0.6);   /* subtle */
+  --border-2: oklch(0.36 0.022 240 / 0.8);   /* default */
+  --border-3: oklch(0.46 0.024 240);          /* strong */
+
+  /* ---------- Color: Accent (cyan HUD) ---------- */
+  --accent-50:  oklch(0.96 0.030 210);
+  --accent-100: oklch(0.90 0.060 205);
+  --accent-300: oklch(0.78 0.130 205);
+  --accent-500: oklch(0.72 0.150 205);   /* primary accent */
+  --accent-600: oklch(0.64 0.140 207);
+  --accent-700: oklch(0.54 0.120 210);
+  --accent-glow: oklch(0.72 0.150 205 / 0.35);
+  --accent-glow-soft: oklch(0.72 0.150 205 / 0.18);
+  --accent-tint: oklch(0.72 0.150 205 / 0.10);
+
+  /* ---------- Color: Status ---------- */
+  --status-running: oklch(0.78 0.150 155);     /* mint green */
+  --status-running-glow: oklch(0.78 0.150 155 / 0.35);
+  --status-waiting: oklch(0.82 0.140 80);      /* amber */
+  --status-waiting-glow: oklch(0.82 0.140 80 / 0.40);
+  --status-stopped: oklch(0.55 0.012 240);     /* neutral grey */
+  --status-error: oklch(0.68 0.180 25);        /* red */
+  --status-error-glow: oklch(0.68 0.180 25 / 0.35);
+
+  /* ---------- Typography ---------- */
+  --font-sans: "Inter Display", "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "JetBrains Mono Variable", ui-monospace, "SF Mono", Consolas, monospace;
+
+  --fs-10: 0.6875rem;    /* 11px - micro labels */
+  --fs-11: 0.75rem;      /* 12px - meta */
+  --fs-12: 0.8125rem;    /* 13px - body sm */
+  --fs-13: 0.875rem;     /* 14px - body */
+  --fs-14: 0.9375rem;    /* 15px - body lg */
+  --fs-16: 1rem;         /* 16px - heading sm */
+  --fs-18: 1.125rem;     /* 18px - heading */
+  --fs-22: 1.375rem;     /* 22px - heading lg */
+  --fs-28: 1.75rem;      /* 28px - display sm */
+  --fs-36: 2.25rem;      /* 36px - display */
+
+  --lh-tight: 1.15;
+  --lh-snug: 1.30;
+  --lh-normal: 1.50;
+  --lh-relaxed: 1.65;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-mono: -0.005em;
+
+  /* ---------- Spacing (4px base) ---------- */
+  --sp-0: 0;
+  --sp-1: 0.25rem;    /* 4 */
+  --sp-2: 0.5rem;     /* 8 */
+  --sp-3: 0.75rem;    /* 12 */
+  --sp-4: 1rem;       /* 16 */
+  --sp-5: 1.25rem;    /* 20 */
+  --sp-6: 1.5rem;     /* 24 */
+  --sp-8: 2rem;       /* 32 */
+  --sp-10: 2.5rem;    /* 40 */
+  --sp-12: 3rem;      /* 48 */
+  --sp-16: 4rem;      /* 64 */
+
+  /* ---------- Radius ---------- */
+  --r-xs: 3px;
+  --r-sm: 5px;
+  --r-md: 7px;
+  --r-lg: 10px;
+  --r-xl: 14px;
+  --r-2xl: 20px;
+  --r-full: 999px;
+
+  /* ---------- Elevation / Shadows ---------- */
+  --shadow-1: 0 1px 0 0 oklch(1 0 0 / 0.04) inset, 0 1px 2px 0 oklch(0 0 0 / 0.4);
+  --shadow-2: 0 1px 0 0 oklch(1 0 0 / 0.05) inset, 0 4px 12px -2px oklch(0 0 0 / 0.5);
+  --shadow-3: 0 1px 0 0 oklch(1 0 0 / 0.06) inset, 0 12px 32px -4px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(0 0 0 / 0.3);
+
+  --glow-accent: 0 0 0 1px var(--accent-glow), 0 0 16px -2px var(--accent-glow);
+  --glow-accent-sm: 0 0 0 1px var(--accent-glow-soft), 0 0 8px -1px var(--accent-glow-soft);
+  --glow-running: 0 0 8px -1px var(--status-running-glow);
+  --glow-waiting: 0 0 8px -1px var(--status-waiting-glow);
+
+  /* ---------- Focus ---------- */
+  --focus-ring: 0 0 0 2px var(--surface-0), 0 0 0 4px var(--accent-500), 0 0 16px -2px var(--accent-glow);
+
+  /* ---------- Motion ---------- */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 360ms;
+
+  /* ---------- Layout ---------- */
+  --header-h: 48px;
+  --footer-h: 28px;
+  --drawer-w: clamp(360px, 48vw, 560px);
+  --content-max: 1400px;
+
+  /* ---------- Density (overridden by [data-density]) ---------- */
+  --row-h: 56px;          /* confortable default */
+  --row-pad-y: 12px;
+  --row-pad-x: 14px;
+  --row-gap: 8px;
+  --card-pad: 16px;
+  --stack-gap: 14px;
+}
+
+/* ---------- Light theme override ---------- */
+[data-theme="light"] {
+  --surface-0: oklch(0.985 0.003 240);
+  --surface-1: oklch(0.97 0.004 240);
+  --surface-2: oklch(0.94 0.006 240);
+  --surface-3: oklch(0.91 0.008 240);
+  --surface-4: oklch(0.87 0.010 240);
+
+  --text-1: oklch(0.18 0.020 240);
+  --text-2: oklch(0.36 0.018 240);
+  --text-3: oklch(0.50 0.014 240);
+  --text-4: oklch(0.66 0.012 240);
+  --text-inverse: oklch(0.98 0.005 240);
+
+  --border-1: oklch(0.78 0.010 240 / 0.7);
+  --border-2: oklch(0.70 0.012 240 / 0.85);
+  --border-3: oklch(0.55 0.014 240);
+
+  --accent-500: oklch(0.55 0.150 215);
+  --accent-glow: oklch(0.55 0.150 215 / 0.30);
+  --accent-glow-soft: oklch(0.55 0.150 215 / 0.14);
+  --accent-tint: oklch(0.55 0.150 215 / 0.10);
+
+  --status-running: oklch(0.55 0.140 155);
+  --status-waiting: oklch(0.62 0.150 65);
+  --status-stopped: oklch(0.62 0.012 240);
+
+  --shadow-1: 0 1px 0 0 oklch(1 0 0 / 0.6) inset, 0 1px 2px 0 oklch(0 0 0 / 0.06);
+  --shadow-2: 0 1px 0 0 oklch(1 0 0 / 0.7) inset, 0 4px 12px -2px oklch(0 0 0 / 0.10);
+  --shadow-3: 0 1px 0 0 oklch(1 0 0 / 0.7) inset, 0 12px 32px -4px oklch(0 0 0 / 0.14), 0 0 0 1px oklch(0 0 0 / 0.06);
+}
+
+/* ---------- Density modes ---------- */
+[data-density="compact"] {
+  --row-h: 40px;
+  --row-pad-y: 8px;
+  --row-pad-x: 10px;
+  --row-gap: 4px;
+  --card-pad: 10px;
+  --stack-gap: 8px;
+}
+
+[data-density="confortable"], [data-density="comfortable"] {
+  --row-h: 56px;
+  --row-pad-y: 12px;
+  --row-pad-x: 14px;
+  --row-gap: 8px;
+  --card-pad: 16px;
+  --stack-gap: 14px;
+}
+
+[data-density="spacieux"], [data-density="spacious"] {
+  --row-h: 76px;
+  --row-pad-y: 18px;
+  --row-pad-x: 18px;
+  --row-gap: 12px;
+  --card-pad: 22px;
+  --stack-gap: 20px;
+}
+
+/* ---------- A11y: reduce motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

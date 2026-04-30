@@ -1,0 +1,268 @@
+/* ============================================================
+   Session Card — project / path / branch / IDE / status / actions
+   Status-led visual (couleur dominante par statut)
+   ============================================================ */
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 var(--sp-4) var(--sp-4);
+  container-type: inline-size;
+  container-name: list;
+}
+
+.session-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.session-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-3);
+  position: sticky;
+  top: 0;
+  background: var(--surface-0);
+  z-index: 1;
+}
+.session-group-header .count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  color: var(--text-4);
+  font-weight: var(--fw-regular);
+}
+.session-group-header .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--border-1);
+}
+
+.session-card {
+  --card-accent: var(--status-stopped);
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--row-gap) var(--sp-3);
+  padding: var(--row-pad-y) var(--row-pad-x);
+  background: var(--surface-1);
+  border: 1px solid var(--border-1);
+  border-left: 2px solid var(--card-accent);
+  border-radius: var(--r-md);
+  margin-bottom: 6px;
+  min-height: var(--row-h);
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+
+.session-card:hover {
+  background: var(--surface-2);
+  border-color: var(--border-2);
+  border-left-color: var(--card-accent);
+}
+
+.session-card[data-status="running"] { --card-accent: var(--status-running); }
+.session-card[data-status="waiting"] { --card-accent: var(--status-waiting); }
+.session-card[data-status="stopped"] { --card-accent: var(--status-stopped); }
+.session-card[data-status="error"]   { --card-accent: var(--status-error); }
+
+.session-card[data-status="waiting"] {
+  background: linear-gradient(90deg, oklch(0.82 0.140 80 / 0.06), transparent 30%), var(--surface-1);
+}
+
+/* IDE icon slot */
+.session-ide {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  border: 1px solid var(--border-1);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+[data-density="compact"] .session-ide { width: 24px; height: 24px; font-size: 10px; }
+[data-density="spacieux"] .session-ide, [data-density="spacious"] .session-ide { width: 38px; height: 38px; font-size: var(--fs-12); }
+
+/* IDE color hints (subtle) */
+.session-ide[data-ide="claude-code"] { color: oklch(0.78 0.130 35); }
+.session-ide[data-ide="cursor"]      { color: oklch(0.92 0 0); }
+.session-ide[data-ide="vscode"]      { color: oklch(0.72 0.130 235); }
+.session-ide[data-ide="codex"]       { color: oklch(0.78 0.140 145); }
+.session-ide[data-ide="antigravity"] { color: oklch(0.76 0.150 295); }
+
+/* Body */
+.session-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+
+.session-line-1 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.session-project {
+  font-size: var(--fs-13);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
+  letter-spacing: var(--tracking-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.session-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  color: var(--text-3);
+  padding: 2px 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-xs);
+  letter-spacing: var(--tracking-mono);
+  flex-shrink: 0;
+}
+.session-branch svg { width: 10px; height: 10px; opacity: 0.7; }
+
+.session-line-2 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  color: var(--text-3);
+  letter-spacing: var(--tracking-mono);
+}
+.session-path {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+.session-ide-name {
+  flex-shrink: 0;
+  color: var(--text-2);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  font-size: var(--fs-10);
+}
+
+/* Status pill (dot + label, no fill) */
+.session-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-11);
+  font-weight: var(--fw-medium);
+  color: var(--card-accent);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.session-status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in oklch, currentColor 20%, transparent);
+  position: relative;
+}
+
+.session-card[data-status="running"] .session-status .dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0.4;
+  animation: ring-pulse 2.4s var(--ease-in-out) infinite;
+}
+
+.session-card[data-status="waiting"] .session-status .dot {
+  animation: dot-pulse 1.4s var(--ease-in-out) infinite;
+  box-shadow: 0 0 0 3px color-mix(in oklch, currentColor 25%, transparent), 0 0 12px currentColor;
+}
+
+@keyframes ring-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.6); opacity: 0; }
+}
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* Actions */
+.session-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0.6;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.session-card:hover .session-actions { opacity: 1; }
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  color: var(--text-3);
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.icon-btn:hover { background: var(--surface-3); color: var(--text-1); }
+.icon-btn:focus-visible { color: var(--text-1); }
+.icon-btn svg { width: 14px; height: 14px; }
+
+[data-density="compact"] .icon-btn { width: 22px; height: 22px; }
+[data-density="compact"] .icon-btn svg { width: 12px; height: 12px; }
+
+/* Wait time / runtime monoline */
+.session-runtime {
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  color: var(--text-3);
+  letter-spacing: var(--tracking-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Responsive */
+@container list (max-width: 479px) {
+  .session-card {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "ide body status"
+      "actions actions actions";
+    row-gap: 6px;
+  }
+  .session-ide { grid-area: ide; }
+  .session-body { grid-area: body; }
+  .session-status { grid-area: status; }
+  .session-status .label { display: none; }
+  .session-actions { grid-area: actions; justify-content: flex-end; opacity: 1; border-top: 1px dashed var(--border-1); padding-top: 6px; margin-top: 2px; }
+  .session-line-2 { font-size: var(--fs-10); }
+}
+@container list (max-width: 379px) {
+  .session-branch .branch-text { display: inline; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

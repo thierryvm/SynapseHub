@@ -1,0 +1,166 @@
+/* ============================================================
+   Onboarding modal — 3 slides welcome
+   ============================================================ */
+
+.onboard-backdrop {
+  position: fixed;
+  inset: 0;
+  background: oklch(0.08 0.02 240 / 0.7);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: var(--sp-4);
+}
+
+.onboard {
+  width: min(560px, 100%);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-3), 0 0 60px -10px var(--accent-glow);
+  overflow: hidden;
+  position: relative;
+  container-type: inline-size;
+  container-name: onboard;
+}
+
+.onboard::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-500), transparent);
+  opacity: 0.5;
+}
+
+.onboard-visual {
+  padding: var(--sp-12) var(--sp-6) var(--sp-6);
+  display: grid;
+  place-items: center;
+  position: relative;
+  background:
+    radial-gradient(ellipse 60% 80% at 50% 0%, var(--accent-tint), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 100%, oklch(0.16 0.02 240), transparent 70%);
+  min-height: 220px;
+}
+
+.onboard-glyph {
+  width: 96px;
+  height: 96px;
+  color: var(--accent-500);
+  filter: drop-shadow(0 0 20px var(--accent-glow));
+}
+.onboard-glyph svg { width: 100%; height: 100%; }
+
+.onboard-content {
+  padding: var(--sp-5) var(--sp-6) var(--sp-4);
+  text-align: center;
+}
+
+.onboard-eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--fs-10);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--accent-300);
+  margin: 0 0 var(--sp-2);
+}
+
+.onboard-title {
+  font-size: var(--fs-22);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-1);
+  margin: 0 0 var(--sp-2);
+  text-wrap: balance;
+}
+
+.onboard-body {
+  font-size: var(--fs-13);
+  color: var(--text-2);
+  line-height: var(--lh-relaxed);
+  margin: 0 auto;
+  max-width: 420px;
+  text-wrap: pretty;
+}
+
+.onboard-body code {
+  background: var(--surface-3);
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
+  font-size: 0.92em;
+  border: 1px solid var(--border-1);
+  color: var(--text-1);
+}
+
+.onboard-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border-1);
+  background: var(--surface-1);
+}
+
+.onboard-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.onboard-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--surface-4);
+  transition: all var(--dur-base) var(--ease-out);
+}
+.onboard-dot[data-active="true"] {
+  width: 18px;
+  border-radius: 3px;
+  background: var(--accent-500);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.onboard-spacer { flex: 1; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-12);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-tight);
+  border: 1px solid transparent;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.btn svg { width: 12px; height: 12px; }
+
+.btn-ghost { color: var(--text-3); }
+.btn-ghost:hover { color: var(--text-1); background: var(--surface-3); }
+
+.btn-secondary {
+  background: var(--surface-2);
+  border-color: var(--border-2);
+  color: var(--text-1);
+}
+.btn-secondary:hover { background: var(--surface-3); }
+
+.btn-primary {
+  background: var(--accent-tint);
+  border-color: var(--accent-500);
+  color: var(--accent-100);
+  box-shadow: var(--glow-accent-sm);
+}
+.btn-primary:hover {
+  background: color-mix(in oklch, var(--accent-500) 22%, transparent);
+  box-shadow: var(--glow-accent);
+}
+
+@container onboard (max-width: 419px) {
+  .onboard-visual { min-height: 160px; padding: var(--sp-8) var(--sp-4) var(--sp-4); }
+  .onboard-glyph { width: 72px; height: 72px; }
+  .onboard-title { font-size: var(--fs-18); }
+}

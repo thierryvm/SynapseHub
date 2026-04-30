@@ -239,6 +239,18 @@ pub fn run() {
             });
 
             build_tray(app.handle())?;
+
+            // Opt-in: open DevTools at startup when built with
+            // `--features debug-devtools`. The feature also pulls in
+            // `tauri/devtools`, which is what actually compiles the inspector
+            // into the binary; without it, `open_devtools()` is a no-op.
+            #[cfg(feature = "debug-devtools")]
+            {
+                if let Some(window) = app.get_webview_window("dashboard") {
+                    window.open_devtools();
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

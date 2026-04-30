@@ -1,0 +1,99 @@
+/* ============================================================
+   SynapseHub — Base reset + body
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--surface-0);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  line-height: var(--lh-normal);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow: hidden; /* desktop window */
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+}
+
+/* Subtle ambient backdrop — HUD vibe, very faint */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% -10%, var(--accent-tint), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 100% 100%, var(--accent-tint), transparent 70%);
+  opacity: 0.5;
+  z-index: 0;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+
+a { color: var(--accent-500); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+code, pre, kbd { font-family: var(--font-mono); }
+
+::selection {
+  background: var(--accent-glow);
+  color: var(--text-1);
+}
+
+/* Scrollbar — subtle HUD style */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: var(--r-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--border-3); background-clip: padding-box; border: 2px solid transparent; }
+
+/* Universal focus ring */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+
+/* Utility for SR-only */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* App shell */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  position: relative;
+  z-index: 1;
+}
+
+.app-main {
+  flex: 1;
+  overflow: auto;
+  container-type: inline-size;
+  container-name: main;
+}
