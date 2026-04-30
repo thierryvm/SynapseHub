@@ -23,10 +23,15 @@ async fn get_sessions(state: State<'_, Arc<Mutex<AppState>>>) -> Result<Vec<Agen
     Ok(s.sessions.clone())
 }
 
-/// Focuses the window of the process with the given PID.
+/// Focuses the window of the process with the given PID (or one of its
+/// ancestors — see `focus::focus_window_by_pid`). Returns `true` if a
+/// window was actually brought to the foreground; `false` means no window
+/// was found in the parent chain (typical for orphaned PIDs whose terminal
+/// host has since been closed). Errors are logged but never propagate to
+/// JS, so the UI stays responsive even if the focus call fails.
 #[tauri::command]
-fn focus_window(pid: u32) {
-    focus::focus_window_by_pid(pid);
+fn focus_window(pid: u32) -> bool {
+    focus::focus_window_by_pid(pid)
 }
 
 /// Clears the waiting marker once the user explicitly returns to the agent.

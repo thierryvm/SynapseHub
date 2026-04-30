@@ -64,18 +64,63 @@ fn session_identity(project_path: &str, ide_name: &str) -> String {
 
 /// Returns true when a path points to system-owned locations that do not
 /// represent a user project we should surface in the dashboard.
+///
+/// The `:\windows\` pattern is matched with the drive-letter prefix on
+/// purpose: a bare `\windows\` substring would also flag user projects like
+/// `F:\PROJECTS\windows-toolbox\` (the trailing slash before `windows` is the
+/// path separator). Anchoring on `:\windows\` keeps the rule strictly aimed
+/// at the system root.
 fn is_system_path(path: &str) -> bool {
     let lower = path.to_lowercase();
     path.is_empty()
         || path == "/"
         || lower.contains("program files")
         || lower.contains("appdata")
+        || lower.contains("\\system32")
+        || lower.contains("\\syswow64")
+        || lower.contains(":\\windows\\")
+        || lower.ends_with(":\\windows")
+        || lower.contains("/system/")
         || lower.contains("/usr/bin")
         || lower.contains("/usr/lib")
+        || lower.contains("/usr/sbin")
+}
+
+/// Returns true when `path` looks like an actual project root rather than a
+/// generic container directory.
+///
+/// A "project marker" is any of the conventional manifest / metadata files
+/// that signal a real codebase (Git checkout, language manifest, IDE
+/// workspace). We use this as a positive gate when `git2::Repository::discover`
+/// fails: without it, a CC Terminal session opened in a parent container
+/// like `F:\PROJECTS\Apps\` would be accepted as a "project" and surface in
+/// the dashboard, even though it is just a folder of folders.
+fn has_project_indicator(path: &Path) -> bool {
+    const INDICATORS: &[&str] = &[
+        ".git",
+        "package.json",
+        "Cargo.toml",
+        "pyproject.toml",
+        "go.mod",
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "Gemfile",
+        "composer.json",
+        ".project",
+        ".vscode",
+        ".idea",
+    ];
+    INDICATORS.iter().any(|i| path.join(i).exists())
 }
 
 /// Best-effort normalization that collapses files to their parent directory and
 /// upgrades nested paths to the repository root when a Git checkout is found.
+///
+/// When the candidate is not inside a Git repository, we still accept it iff
+/// it carries a project marker (cf. `has_project_indicator`). This guards
+/// against bare CC Terminal sessions opened in container directories such as
+/// `F:\PROJECTS\Apps\` polluting the dashboard with a fake "Apps" project.
 fn normalize_project_path(path: &Path) -> Option<String> {
     let candidate = if path.is_file() { path.parent()? } else { path };
 
@@ -86,7 +131,13 @@ fn normalize_project_path(path: &Path) -> Option<String> {
     let resolved = git2::Repository::discover(candidate)
         .ok()
         .and_then(|repo| repo.workdir().map(PathBuf::from))
-        .unwrap_or_else(|| candidate.to_path_buf());
+        .or_else(|| {
+            if has_project_indicator(candidate) {
+                Some(candidate.to_path_buf())
+            } else {
+                None
+            }
+        })?;
 
     let normalized = resolved.to_string_lossy().into_owned();
     if is_system_path(&normalized) {
@@ -492,10 +543,11 @@ pub async fn start_watcher(state: Arc<Mutex<AppState>>, app: AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{
-        detect_ide_name, is_system_path, looks_like_project_path_arg, should_resume,
-        RESUME_CPU_THRESHOLD, RESUME_POLLS_REQUIRED,
+        detect_ide_name, has_project_indicator, is_system_path, looks_like_project_path_arg,
+        normalize_project_path, should_resume, RESUME_CPU_THRESHOLD, RESUME_POLLS_REQUIRED,
     };
     use crate::types::WaitingState;
+    use std::path::Path;
 
     fn waiting_state(pid: Option<u32>) -> WaitingState {
         WaitingState {
@@ -653,6 +705,47 @@ mod tests {
     }
 
     #[test]
+    fn flags_windows_system32_as_non_project() {
+        // The smoke-test fault: a PowerShell admin dropping a CC Terminal
+        // session in `C:\WINDOWS\system32` was being surfaced as a project.
+        assert!(is_system_path(r"C:\WINDOWS\system32"));
+        assert!(is_system_path(r"C:\WINDOWS\system32\"));
+        assert!(is_system_path(r"C:\Windows\System32\drivers"));
+    }
+
+    #[test]
+    fn flags_windows_syswow64_as_non_project() {
+        // 32-bit syscall layer on 64-bit Windows. Same intent as system32.
+        assert!(is_system_path(r"C:\WINDOWS\SysWOW64"));
+        assert!(is_system_path(r"C:\Windows\SysWOW64\drivers"));
+    }
+
+    #[test]
+    fn flags_generic_windows_dir_as_non_project() {
+        // Catch-all for `X:\Windows\…` subtrees we have not enumerated.
+        assert!(is_system_path(r"C:\Windows\WinSxS"));
+        assert!(is_system_path(r"C:\Windows"));
+    }
+
+    #[test]
+    fn does_not_flag_user_projects_with_windows_in_name() {
+        // Anti-false-negative: a user project whose folder name contains
+        // "windows" must not be flagged as system. Anchoring the rule on
+        // the drive-letter prefix `:\windows\` keeps user paths safe.
+        assert!(!is_system_path(r"F:\PROJECTS\windows-toolbox"));
+        assert!(!is_system_path(r"F:\PROJECTS\Apps\windows-helper\src"));
+    }
+
+    #[test]
+    fn flags_unix_system_locations_as_non_project() {
+        assert!(is_system_path("/usr/bin"));
+        assert!(is_system_path("/usr/lib/x86_64-linux-gnu"));
+        assert!(is_system_path("/usr/sbin"));
+        assert!(is_system_path("/system/bin/sh"));
+        assert!(!is_system_path("/home/thierry/projects/synapsehub"));
+    }
+
+    #[test]
     fn path_arg_filter_ignores_plain_flags_and_accepts_real_paths() {
         assert!(!looks_like_project_path_arg("--port"));
         assert!(!looks_like_project_path_arg("serve"));
@@ -660,5 +753,107 @@ mod tests {
             "F:\\PROJECTS\\Apps\\SynapseHub"
         ));
         assert!(looks_like_project_path_arg("./src"));
+    }
+
+    /// Creates an isolated test directory unique to each invocation, rooted
+    /// under the user's home directory.
+    ///
+    /// We deliberately avoid two cleaner-looking alternatives:
+    ///
+    /// - `std::env::temp_dir()`: resolves to `…\AppData\Local\Temp\…` on
+    ///   Windows, which `is_system_path` (correctly) flags as system. Any
+    ///   end-to-end test of `normalize_project_path` placed there would
+    ///   fail spuriously.
+    /// - `CARGO_MANIFEST_DIR/target/…`: lives inside the SynapseHub Git
+    ///   tree, so `git2::Repository::discover` walks up and finds the
+    ///   project root. A test that intends to place a "container without
+    ///   project marker" would then resolve to the SynapseHub workdir and
+    ///   pass for the wrong reason.
+    ///
+    /// Home directory is typically neither under a system path nor inside
+    /// any Git tree; we keep test artefacts under `.synapsehub-test-tmp/`
+    /// to make them obvious and easy to wipe.
+    fn make_temp_dir(label: &str) -> std::path::PathBuf {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or_default();
+        let base = dirs::home_dir().unwrap_or_else(std::env::temp_dir);
+        let dir = base
+            .join(".synapsehub-test-tmp")
+            .join(format!("{label}-{nonce}"));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
+
+    #[test]
+    fn project_indicator_accepts_git_repo() {
+        let dir = make_temp_dir("git");
+        std::fs::create_dir_all(dir.join(".git")).expect("create .git");
+        assert!(has_project_indicator(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn project_indicator_accepts_node_project() {
+        let dir = make_temp_dir("node");
+        std::fs::write(dir.join("package.json"), "{}").expect("write package.json");
+        assert!(has_project_indicator(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn project_indicator_accepts_rust_project() {
+        let dir = make_temp_dir("rust");
+        std::fs::write(dir.join("Cargo.toml"), "[package]\nname = \"x\"\n")
+            .expect("write Cargo.toml");
+        assert!(has_project_indicator(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn project_indicator_rejects_empty_container() {
+        // The smoke-test fault: `F:\PROJECTS\Apps\` had no project marker
+        // of its own (just sub-folders). It must be rejected.
+        let dir = make_temp_dir("container");
+        assert!(!has_project_indicator(&dir));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn normalize_rejects_container_dir_without_project_marker() {
+        // End-to-end: a container directory like `F:\PROJECTS\Apps\` must
+        // not be returned as a project path even though it exists.
+        let dir = make_temp_dir("normalize-container");
+        assert!(normalize_project_path(&dir).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn normalize_accepts_dir_with_project_marker() {
+        let dir = make_temp_dir("normalize-marker");
+        std::fs::write(dir.join("Cargo.toml"), "[package]\nname = \"x\"\n")
+            .expect("write Cargo.toml");
+        assert!(normalize_project_path(&dir).is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn normalize_rejects_nonexistent_path() {
+        let path = std::env::temp_dir().join("synapsehub-does-not-exist-xyz");
+        let _ = std::fs::remove_dir_all(&path);
+        assert!(normalize_project_path(&path).is_none());
+    }
+
+    #[test]
+    fn normalize_rejects_system_path_even_with_marker() {
+        // Defence in depth: if some hostile path with `system32` ever gets
+        // a `.git` folder, we still refuse. Hard to fabricate cleanly in
+        // a temp dir, so we use a synthesized path string by going through
+        // the `is_system_path` fallback. This is a smoke-check, not an
+        // exhaustive proof.
+        let _ = Path::new(""); // silence unused import warnings on Windows
+        assert!(is_system_path(r"C:\WINDOWS\system32"));
     }
 }

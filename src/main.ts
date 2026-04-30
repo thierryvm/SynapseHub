@@ -318,7 +318,15 @@ function renderCard(session: AgentSession): HTMLElement {
     }
 
     if (canFocusWindow) {
-      invoke("focus_window", { pid: session.pid }).catch(console.error);
+      invoke<boolean>("focus_window", { pid: session.pid })
+        .then((focused) => {
+          if (!focused) {
+            console.warn(
+              `focus_window(${session.pid}) → no window found in parent chain (terminal may have closed)`,
+            );
+          }
+        })
+        .catch((err) => console.error(`focus_window(${session.pid}) failed:`, err));
     }
   };
 
