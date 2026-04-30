@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-04-30
+
+### Fixed
+- **Watcher — faux positifs path résolution** ([#26](https://github.com/thierryvm/SynapseHub/issues/26)). `is_system_path` étendu pour rejeter `\system32`, `\syswow64`, `:\windows\…`, `/system/`, `/usr/sbin`. Le pattern Windows est anchored sur `:\windows\` (drive-letter prefix) pour ne pas flagger des projets utilisateurs comme `F:\PROJECTS\windows-toolbox`. Sans ce fix, un PowerShell admin lancé depuis `C:\WINDOWS\system32` faisait apparaître une session fantôme dans le dashboard.
+- **Watcher — exiger un marqueur de projet** ([#26](https://github.com/thierryvm/SynapseHub/issues/26)). `normalize_project_path` n'accepte plus tout dossier existant en fallback de `git2::Repository::discover` : nouvelle fonction `has_project_indicator` qui exige `.git`, `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `pom.xml`, `build.gradle[.kts]`, `Gemfile`, `composer.json`, `.project`, `.vscode`, ou `.idea`. Sans ce fix, une session CC Terminal lancée depuis un dossier container (ex : `F:\PROJECTS\Apps\` sans `.git` propre) pollait le dashboard avec une fausse entrée "Apps".
+- **One-click focus — terminaux modernes** ([#26](https://github.com/thierryvm/SynapseHub/issues/26)). `focus_window_by_pid` remonte désormais la chaîne `parent_pid` (jusqu'à 5 hops, avec cycle guard) avant de tester chaque PID via `EnumWindows`. Cause primaire : un process `claude.exe` (CLI) hébergé dans `pwsh.exe` → `WindowsTerminal.exe` n'a pas de HWND propre — la fenêtre visible appartient au terminal host plusieurs hops au-dessus. Pattern identique sur macOS (`iTerm2`, `Terminal.app`) et Linux (`gnome-terminal`, `konsole`, `alacritty`).
+
+### Changed
+- **`focus_window` Tauri command** retourne désormais `bool` (au lieu de `()`) pour que le frontend logge en console DevTools si le focus a échoué (ex : terminal fermé entre la détection et le clic). Le frontend log un `console.warn` explicite dans ce cas.
+- **DevTools activés en build release** (Cargo feature `tauri/devtools` + `app.windows[].devtools: true` dans `tauri.conf.json`). Permet le diagnostic terrain via `Ctrl+Shift+I`. Sera reverté en v0.2.0 derrière un Cargo feature flag conditionnel (sprint UX/UI rework).
+
+### Tests
+- 13 nouveaux tests unitaires dans `watcher::tests` :
+  - `is_system_path` étendus : `flags_windows_system32_as_non_project`, `flags_windows_syswow64_as_non_project`, `flags_generic_windows_dir_as_non_project`, `does_not_flag_user_projects_with_windows_in_name`, `flags_unix_system_locations_as_non_project`.
+  - `has_project_indicator` : `accepts_git_repo`, `accepts_node_project`, `accepts_rust_project`, `rejects_empty_container`.
+  - `normalize_project_path` end-to-end : `rejects_container_dir_without_project_marker`, `accepts_dir_with_project_marker`, `rejects_nonexistent_path`, `rejects_system_path_even_with_marker`.
+- 3 nouveaux tests unitaires dans `focus::tests` : `chain_starts_with_self`, `chain_is_bounded`, `chain_has_no_duplicates`.
+- Tests Rust : 27 → 43. Tests vitest : 7/7 inchangés.
+
 ## [0.1.3] - 2026-04-29
 
 ### Fixed
