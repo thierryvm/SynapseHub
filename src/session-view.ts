@@ -1,3 +1,5 @@
+import { buildBranchIcon, buildFocusIcon } from "./icons";
+
 export type AgentStatus =
   | { type: "Running"; since_secs: number }
   | { type: "Waiting"; since_secs: number }
@@ -22,6 +24,19 @@ export interface SessionSummary {
   subtitle: string;
   footer: string;
 }
+
+/**
+ * Minimal contract the renderer needs from `@tauri-apps/api/core`. Defining
+ * it here lets us inject a mock in unit tests without pulling Tauri into
+ * the test environment.
+ */
+export type InvokeFn = <T = unknown>(
+  cmd: string,
+  args?: Record<string, unknown>,
+) => Promise<T>;
+
+/** Persisted user preference for the "always on top" window flag. */
+export const ALWAYS_ON_TOP_KEY = "synapsehub_always_on_top";
 
 export function formatDuration(secs: number): string {
   if (secs < 60) return `${secs}s`;
@@ -195,4 +210,222 @@ const IDE_GLYPHS: Record<string, string> = {
 
 export function ideGlyph(ideName: string): string {
   return IDE_GLYPHS[ideKey(ideName)] ?? "··";
+}
+
+// ─── DOM rendering & interaction ────────────────────────────────────────────
+
+/**
+ * Builds the DOM tree for one session card. Returns a fresh `<article>` —
+ * **no event listeners attached**. Wire interactions via
+ * `attachFocusHandler` so the two concerns (markup vs. behaviour) stay
+ * independently testable.
+ */
+export function renderSessionCard(session: AgentSession): HTMLElement {
+  const status = getStatusDataAttr(session.status);
+  const statusLabel = getStatusLabelShort(session.status);
+  const projectLabel = session.project_name || projectNameFromPath(session.project_path);
+  const ideKeyTxt = ideKey(session.ide_name);
+  const canFocus = session.pid > 0;
+
+  const card = document.createElement("article");
+  card.className = "session-card";
+  card.dataset.status = status;
+  card.dataset.pid = String(session.pid);
+  card.tabIndex = 0;
+  card.setAttribute("aria-label", `${projectLabel} — ${statusLabel}`);
+
+  // IDE glyph slot
+  const ide = document.createElement("div");
+  ide.className = "session-ide";
+  ide.dataset.ide = ideKeyTxt;
+  ide.title = session.ide_name;
+  ide.textContent = ideGlyph(session.ide_name);
+  card.appendChild(ide);
+
+  // Body (project / path / ide name / branch)
+  const body = document.createElement("div");
+  body.className = "session-body";
+
+  const line1 = document.createElement("div");
+  line1.className = "session-line-1";
+  const project = document.createElement("span");
+  project.className = "session-project";
+  project.title = projectLabel;
+  project.textContent = projectLabel;
+  line1.appendChild(project);
+  if (session.git_branch) {
+    const branch = document.createElement("span");
+    branch.className = "session-branch";
+    branch.appendChild(buildBranchIcon());
+    const branchTxt = document.createElement("span");
+    branchTxt.className = "branch-text";
+    branchTxt.textContent = session.git_branch;
+    branch.appendChild(branchTxt);
+    line1.appendChild(branch);
+  }
+  body.appendChild(line1);
+
+  const line2 = document.createElement("div");
+  line2.className = "session-line-2";
+  const path = document.createElement("span");
+  path.className = "session-path";
+  path.title = session.project_path;
+  path.textContent = session.project_path;
+  line2.appendChild(path);
+  const ideName = document.createElement("span");
+  ideName.className = "session-ide-name";
+  ideName.textContent = session.ide_name;
+  line2.appendChild(ideName);
+  body.appendChild(line2);
+
+  card.appendChild(body);
+
+  // Status pill
+  const statusEl = document.createElement("div");
+  statusEl.className = "session-status";
+  statusEl.setAttribute("aria-label", `Statut ${statusLabel}`);
+  const dot = document.createElement("span");
+  dot.className = "dot";
+  statusEl.appendChild(dot);
+  const label = document.createElement("span");
+  label.className = "label";
+  label.textContent = statusLabel;
+  statusEl.appendChild(label);
+  if (session.status.type === "Running" || session.status.type === "Waiting") {
+    const runtime = document.createElement("span");
+    runtime.className = "session-runtime";
+    runtime.textContent = formatDuration(session.status.since_secs);
+    statusEl.appendChild(runtime);
+  }
+  card.appendChild(statusEl);
+
+  // Action: focus
+  const actions = document.createElement("div");
+  actions.className = "session-actions";
+  const focusBtn = document.createElement("button");
+  focusBtn.className = "icon-btn card-focus";
+  focusBtn.type = "button";
+  focusBtn.dataset.action = "focus";
+  focusBtn.setAttribute("aria-label", "Focus IDE");
+  focusBtn.title = "Mettre la fenêtre IDE au premier plan";
+  if (!canFocus) focusBtn.disabled = true;
+  focusBtn.appendChild(buildFocusIcon());
+  actions.appendChild(focusBtn);
+  card.appendChild(actions);
+
+  return card;
+}
+
+/**
+ * Wires the focus action on a previously rendered session card.
+ *
+ * Behaviour (matches v0.2.0 fix focus-UX, see handoff
+ * `2026-04-30-1530-v0-2-0-fix-focus-ux-before-tag.md` §5):
+ *
+ * 1. Click on `BUTTON[data-action="focus"]` (or Enter/Space when the card
+ *    has keyboard focus) only triggers the IDE focus flow. **A click on
+ *    the rest of the card body is intentionally a no-op** so the user
+ *    doesn't accidentally hide the dashboard while reading session info.
+ * 2. If the session is `Waiting`, an `acknowledge_waiting` invoke is fired
+ *    first so the waiting marker is cleared regardless of whether the
+ *    focus succeeds.
+ * 3. On `focus_window === true` we invoke `set_always_on_top(false)` so
+ *    the IDE window the user just asked for can come to the foreground
+ *    even when the user has the alwaysOnTop toggle ON. The
+ *    `onFocusChanged` listener in `main.ts` re-applies the toggle when
+ *    the dashboard regains focus.
+ * 4. On `focus_window === false` we keep the dashboard visible and emit a
+ *    `console.warn` so the user can tell the action did nothing (typical
+ *    when the terminal closed between detection and click).
+ */
+export function attachFocusHandler(
+  card: HTMLElement,
+  session: AgentSession,
+  invokeFn: InvokeFn,
+): void {
+  const focusBtn = card.querySelector<HTMLButtonElement>('button[data-action="focus"]');
+  if (!focusBtn) return;
+
+  const trigger = (event: Event) => {
+    event.stopPropagation();
+
+    if (session.status.type === "Waiting") {
+      void invokeFn("acknowledge_waiting", { projectPath: session.project_path }).catch(
+        (err) => console.error(`acknowledge_waiting(${session.project_path}) failed:`, err),
+      );
+    }
+
+    if (session.pid <= 0) return;
+
+    void invokeFn<boolean>("focus_window", { pid: session.pid })
+      .then((focused) => {
+        if (focused) {
+          // Temporarily release alwaysOnTop so the IDE window actually
+          // appears in front. The settings toggle (if user-enabled) is
+          // re-applied via the focus-changed listener in main.ts.
+          void invokeFn("set_always_on_top", { onTop: false }).catch((err) =>
+            console.error("set_always_on_top(false) failed:", err),
+          );
+        } else {
+          console.warn(
+            `focus_window(${session.pid}) → no window found in parent chain (terminal may have closed)`,
+          );
+        }
+      })
+      .catch((err) => console.error(`focus_window(${session.pid}) failed:`, err));
+  };
+
+  focusBtn.addEventListener("click", trigger);
+  card.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      trigger(event);
+    }
+  });
+}
+
+/**
+ * Persists the user preference and pushes it to the Rust side. Called from
+ * the settings drawer toggle.
+ */
+export function setAlwaysOnTopToggle(on: boolean, invokeFn: InvokeFn): void {
+  try {
+    localStorage.setItem(ALWAYS_ON_TOP_KEY, String(on));
+  } catch {
+    /* localStorage blocked — preference won't persist across launches but the
+       runtime call below still applies for the current session */
+  }
+  void invokeFn("set_always_on_top", { onTop: on }).catch((err) =>
+    console.error("set_always_on_top failed:", err),
+  );
+}
+
+/**
+ * Reads the persisted preference at app start and pushes it to Rust if (and
+ * only if) the user explicitly enabled it. Default = OFF (matches
+ * `tauri.conf.json` `alwaysOnTop: false`); we therefore skip the invoke when
+ * the value is missing or "false" to avoid touching the window state for a
+ * no-op.
+ */
+export function restoreAlwaysOnTopFromStorage(invokeFn: InvokeFn): void {
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(ALWAYS_ON_TOP_KEY);
+  } catch {
+    return;
+  }
+  if (stored === "true") {
+    void invokeFn("set_always_on_top", { onTop: true }).catch((err) =>
+      console.error("set_always_on_top failed:", err),
+    );
+  }
+}
+
+/** Reads the current persisted preference. Returns `false` when missing. */
+export function getAlwaysOnTopPreference(): boolean {
+  try {
+    return localStorage.getItem(ALWAYS_ON_TOP_KEY) === "true";
+  } catch {
+    return false;
+  }
 }

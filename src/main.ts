@@ -1,17 +1,19 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { check, type Update } from "@tauri-apps/plugin-updater";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import packageJson from "../package.json";
 import {
   type AgentSession,
-  formatDuration,
-  getStatusDataAttr,
-  getStatusLabelShort,
-  ideGlyph,
-  ideKey,
-  projectNameFromPath,
+  ALWAYS_ON_TOP_KEY,
+  attachFocusHandler,
+  getAlwaysOnTopPreference,
+  renderSessionCard,
+  restoreAlwaysOnTopFromStorage,
+  setAlwaysOnTopToggle,
   sortSessions,
 } from "./session-view";
+import { buildBrandGlyph, buildCheckIcon, buildCopyIcon } from "./icons";
 
 // State
 let sessions: AgentSession[] = [];
@@ -23,7 +25,6 @@ let isInstallingUpdate = false;
 const APP_VERSION_LABEL = `v${packageJson.version}`;
 const ONBOARDING_FLAG = "synapsehub_onboarding_completed_v0.2.0";
 const DENSITY_COMPACT_THRESHOLD = 10;
-const SVG_NS = "http://www.w3.org/2000/svg";
 
 // DOM refs
 const root = document.documentElement;
@@ -52,6 +53,7 @@ const btnCloseDrawer = document.getElementById("btn-close-drawer") as HTMLButton
 const btnCopyConfig = document.getElementById("btn-copy-config") as HTMLButtonElement;
 const configCode = document.getElementById("config-code") as HTMLElement;
 const modalStatus = document.getElementById("modal-status") as HTMLElement;
+const btnToggleAlwaysOnTop = document.getElementById("btn-toggle-always-on-top") as HTMLButtonElement;
 
 const updateSummary = document.getElementById("update-summary") as HTMLElement;
 const updateMeta = document.getElementById("update-meta") as HTMLElement;
@@ -72,224 +74,7 @@ const btnOnboardNext = document.getElementById("onboard-next") as HTMLButtonElem
 
 versionLabel.textContent = APP_VERSION_LABEL;
 
-// SVG builders (no innerHTML)
-function svg(viewBox: string, attrs: Record<string, string> = {}): SVGSVGElement {
-  const el = document.createElementNS(SVG_NS, "svg");
-  el.setAttribute("viewBox", viewBox);
-  el.setAttribute("aria-hidden", "true");
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-  return el;
-}
-
-function svgPath(parent: SVGElement, d: string, attrs: Record<string, string> = {}): void {
-  const p = document.createElementNS(SVG_NS, "path");
-  p.setAttribute("d", d);
-  for (const [k, v] of Object.entries(attrs)) p.setAttribute(k, v);
-  parent.appendChild(p);
-}
-
-function svgCircle(parent: SVGElement, cx: number, cy: number, r: number, attrs: Record<string, string> = {}): void {
-  const c = document.createElementNS(SVG_NS, "circle");
-  c.setAttribute("cx", String(cx));
-  c.setAttribute("cy", String(cy));
-  c.setAttribute("r", String(r));
-  for (const [k, v] of Object.entries(attrs)) c.setAttribute(k, v);
-  parent.appendChild(c);
-}
-
-function svgLine(parent: SVGElement, x1: number, y1: number, x2: number, y2: number, attrs: Record<string, string> = {}): void {
-  const l = document.createElementNS(SVG_NS, "line");
-  l.setAttribute("x1", String(x1));
-  l.setAttribute("y1", String(y1));
-  l.setAttribute("x2", String(x2));
-  l.setAttribute("y2", String(y2));
-  for (const [k, v] of Object.entries(attrs)) l.setAttribute(k, v);
-  parent.appendChild(l);
-}
-
-function buildBranchIcon(): SVGSVGElement {
-  const s = svg("0 0 16 16", {
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "1.4",
-    "stroke-linecap": "round",
-  });
-  svgCircle(s, 4, 3, 1.6);
-  svgCircle(s, 4, 13, 1.6);
-  svgCircle(s, 12, 6, 1.6);
-  svgPath(s, "M4 4.6v6.8");
-  svgPath(s, "M4 7.5c0-1.5 1-2.5 2.5-2.5h2.5");
-  return s;
-}
-
-function buildFocusIcon(): SVGSVGElement {
-  const s = svg("0 0 16 16", {
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "1.4",
-    "stroke-linecap": "round",
-  });
-  svgPath(s, "M2 5V3a1 1 0 0 1 1-1h2");
-  svgPath(s, "M14 5V3a1 1 0 0 0-1-1h-2");
-  svgPath(s, "M2 11v2a1 1 0 0 0 1 1h2");
-  svgPath(s, "M14 11v2a1 1 0 0 1-1 1h-2");
-  svgCircle(s, 8, 8, 2);
-  return s;
-}
-
-function buildCheckIcon(): SVGSVGElement {
-  const s = svg("0 0 16 16", {
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "1.6",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-  });
-  svgPath(s, "M3 8.5l3 3 7-7");
-  return s;
-}
-
-function buildBrandGlyph(): SVGSVGElement {
-  const s = svg("0 0 32 32", { fill: "none", xmlns: SVG_NS });
-  svgCircle(s, 16, 16, 3.2, { fill: "currentColor" });
-  svgCircle(s, 16, 16, 6, { stroke: "currentColor", "stroke-width": "1.2", "stroke-opacity": "0.5" });
-  svgLine(s, 16, 16, 5, 5, { stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" });
-  svgLine(s, 16, 16, 27, 5, { stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" });
-  svgLine(s, 16, 16, 5, 27, { stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" });
-  svgLine(s, 16, 16, 27, 27, { stroke: "currentColor", "stroke-width": "1.6", "stroke-linecap": "round" });
-  svgCircle(s, 5, 5, 2, { fill: "currentColor" });
-  svgCircle(s, 27, 5, 2, { fill: "currentColor" });
-  svgCircle(s, 5, 27, 2, { fill: "currentColor" });
-  svgCircle(s, 27, 27, 2, { fill: "currentColor" });
-  return s;
-}
-
-// Card rendering (DOM API only — no innerHTML)
-function renderSessionCard(session: AgentSession): HTMLElement {
-  const status = getStatusDataAttr(session.status);
-  const statusLabel = getStatusLabelShort(session.status);
-  const projectLabel = session.project_name || projectNameFromPath(session.project_path);
-  const ideKeyTxt = ideKey(session.ide_name);
-  const canFocus = session.pid > 0;
-
-  const card = document.createElement("article");
-  card.className = "session-card";
-  card.dataset.status = status;
-  card.dataset.pid = String(session.pid);
-  card.tabIndex = 0;
-  card.setAttribute("aria-label", `${projectLabel} — ${statusLabel}`);
-
-  // IDE glyph slot
-  const ide = document.createElement("div");
-  ide.className = "session-ide";
-  ide.dataset.ide = ideKeyTxt;
-  ide.title = session.ide_name;
-  ide.textContent = ideGlyph(session.ide_name);
-  card.appendChild(ide);
-
-  // Body (project / path / ide name / branch)
-  const body = document.createElement("div");
-  body.className = "session-body";
-
-  const line1 = document.createElement("div");
-  line1.className = "session-line-1";
-  const project = document.createElement("span");
-  project.className = "session-project";
-  project.title = projectLabel;
-  project.textContent = projectLabel;
-  line1.appendChild(project);
-  if (session.git_branch) {
-    const branch = document.createElement("span");
-    branch.className = "session-branch";
-    branch.appendChild(buildBranchIcon());
-    const branchTxt = document.createElement("span");
-    branchTxt.className = "branch-text";
-    branchTxt.textContent = session.git_branch;
-    branch.appendChild(branchTxt);
-    line1.appendChild(branch);
-  }
-  body.appendChild(line1);
-
-  const line2 = document.createElement("div");
-  line2.className = "session-line-2";
-  const path = document.createElement("span");
-  path.className = "session-path";
-  path.title = session.project_path;
-  path.textContent = session.project_path;
-  line2.appendChild(path);
-  const ideName = document.createElement("span");
-  ideName.className = "session-ide-name";
-  ideName.textContent = session.ide_name;
-  line2.appendChild(ideName);
-  body.appendChild(line2);
-
-  card.appendChild(body);
-
-  // Status pill
-  const statusEl = document.createElement("div");
-  statusEl.className = "session-status";
-  statusEl.setAttribute("aria-label", `Statut ${statusLabel}`);
-  const dot = document.createElement("span");
-  dot.className = "dot";
-  statusEl.appendChild(dot);
-  const label = document.createElement("span");
-  label.className = "label";
-  label.textContent = statusLabel;
-  statusEl.appendChild(label);
-  if (session.status.type === "Running" || session.status.type === "Waiting") {
-    const runtime = document.createElement("span");
-    runtime.className = "session-runtime";
-    runtime.textContent = formatDuration(session.status.since_secs);
-    statusEl.appendChild(runtime);
-  }
-  card.appendChild(statusEl);
-
-  // Action: focus
-  const actions = document.createElement("div");
-  actions.className = "session-actions";
-  const focusBtn = document.createElement("button");
-  focusBtn.className = "icon-btn";
-  focusBtn.type = "button";
-  focusBtn.dataset.action = "focus";
-  focusBtn.setAttribute("aria-label", "Focus IDE");
-  focusBtn.title = "Mettre la fenêtre IDE au premier plan";
-  if (!canFocus) focusBtn.disabled = true;
-  focusBtn.appendChild(buildFocusIcon());
-  actions.appendChild(focusBtn);
-  card.appendChild(actions);
-
-  // Click handlers (event capture pattern from v0.1.5)
-  const handleAction = (event: Event) => {
-    event.stopPropagation();
-    if (status === "waiting") {
-      invoke("acknowledge_waiting", { projectPath: session.project_path }).catch(console.error);
-    }
-    if (!canFocus) return;
-    invoke<boolean>("focus_window", { pid: session.pid })
-      .then((focused) => {
-        if (focused) {
-          // v0.1.5: dashboard is alwaysOnTop, hide it so the IDE actually shows.
-          invoke("hide_window").catch(console.error);
-        } else {
-          console.warn(
-            `focus_window(${session.pid}) → no window found in parent chain (terminal may have closed)`,
-          );
-        }
-      })
-      .catch((err) => console.error(`focus_window(${session.pid}) failed:`, err));
-  };
-
-  card.addEventListener("click", handleAction);
-  focusBtn.addEventListener("click", handleAction);
-  card.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      handleAction(event);
-    }
-  });
-
-  return card;
-}
+// ─── Stats / footer / density ───────────────────────────────────────────────
 
 function updateStats(): void {
   const active = sessions.filter((s) => s.status.type !== "Idle");
@@ -338,7 +123,11 @@ function render(): void {
   existingCards.forEach((c) => c.remove());
 
   if (!isEmpty) {
-    for (const s of sorted) sessionList.appendChild(renderSessionCard(s));
+    for (const s of sorted) {
+      const card = renderSessionCard(s);
+      attachFocusHandler(card, s, invoke);
+      sessionList.appendChild(card);
+    }
   }
 
   updateStats();
@@ -348,7 +137,8 @@ function render(): void {
       : "SynapseHub";
 }
 
-// Settings drawer
+// ─── Settings drawer ────────────────────────────────────────────────────────
+
 const TK_PATTERN =
   /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[{}\[\],])/g;
 
@@ -366,7 +156,6 @@ function tokenClass(match: string): string {
  * the gaps between tokens are preserved as plain text nodes.
  */
 function highlightJSONIntoElement(target: HTMLElement, raw: string): void {
-  // Clear previous content
   while (target.firstChild) target.removeChild(target.firstChild);
 
   let lastIndex = 0;
@@ -420,10 +209,17 @@ async function loadConfig(): Promise<void> {
   }
 }
 
+function syncAlwaysOnTopButton(): void {
+  if (!btnToggleAlwaysOnTop) return;
+  const on = getAlwaysOnTopPreference();
+  btnToggleAlwaysOnTop.setAttribute("aria-pressed", String(on));
+}
+
 function openDrawer(): void {
   drawer.dataset.open = "true";
   drawer.setAttribute("aria-hidden", "false");
   drawerBackdrop.dataset.open = "true";
+  syncAlwaysOnTopButton();
   void loadConfig();
   void checkForUpdates(false);
 }
@@ -441,6 +237,14 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && drawer.dataset.open === "true") closeDrawer();
 });
 
+if (btnToggleAlwaysOnTop) {
+  btnToggleAlwaysOnTop.addEventListener("click", () => {
+    const next = btnToggleAlwaysOnTop.getAttribute("aria-pressed") !== "true";
+    btnToggleAlwaysOnTop.setAttribute("aria-pressed", String(next));
+    setAlwaysOnTopToggle(next, invoke);
+  });
+}
+
 btnCopyConfig.addEventListener("click", async () => {
   const raw = configCode.dataset.raw ?? configCode.textContent ?? "";
   try {
@@ -455,26 +259,8 @@ btnCopyConfig.addEventListener("click", async () => {
     setTimeout(() => {
       btnCopyConfig.removeAttribute("data-state");
       while (btnCopyConfig.firstChild) btnCopyConfig.removeChild(btnCopyConfig.firstChild);
-      // Restore the original SVG + label
-      const s = svg("0 0 16 16", {
-        fill: "none",
-        stroke: "currentColor",
-        "stroke-width": "1.4",
-        "stroke-linecap": "round",
-        "stroke-linejoin": "round",
-      });
-      svgPath(s, "M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2");
-      // Inner rect via path is awkward — use rect element instead.
-      const rect = document.createElementNS(SVG_NS, "rect");
-      rect.setAttribute("x", "5");
-      rect.setAttribute("y", "5");
-      rect.setAttribute("width", "9");
-      rect.setAttribute("height", "9");
-      rect.setAttribute("rx", "1.2");
-      s.appendChild(rect);
-      btnCopyConfig.appendChild(s);
+      btnCopyConfig.appendChild(buildCopyIcon());
       btnCopyConfig.appendChild(document.createTextNode(" Copier"));
-
       if (modalStatus.textContent === "Configuration copiée") modalStatus.textContent = "";
     }, 1800);
   } catch {
@@ -482,7 +268,8 @@ btnCopyConfig.addEventListener("click", async () => {
   }
 });
 
-// Updates
+// ─── Updates ────────────────────────────────────────────────────────────────
+
 function setUpdateControls(): void {
   btnCheckUpdates.disabled = isCheckingUpdates || isInstallingUpdate;
   btnInstallUpdate.disabled = !availableUpdate || isCheckingUpdates || isInstallingUpdate;
@@ -614,7 +401,8 @@ function formatBytes(bytes: number): string {
 btnCheckUpdates.addEventListener("click", () => void checkForUpdates(true));
 btnInstallUpdate.addEventListener("click", () => void installUpdate());
 
-// Onboarding (3 slides, persisted in localStorage)
+// ─── Onboarding (3 slides, persisted in localStorage) ─────────────────
+
 interface OnboardSlide {
   eyebrow: string;
   title: string;
@@ -642,7 +430,9 @@ const ONBOARD_SLIDES: OnboardSlide[] = [
     eyebrow: "Étape 3 / 3 — Focus",
     title: "Une carte = un saut vers l'IDE",
     bodyLines: [
-      "Cliquez sur une session pour amener la fenêtre Windows Terminal / IDE au premier plan. SynapseHub se cache automatiquement après le focus.",
+      "Cliquez sur le bouton flèche d'une session pour amener la fenêtre Windows Terminal / IDE au premier plan. Le bouton ",
+      { code: "Toujours au premier plan" },
+      " des paramètres garde SynapseHub par-dessus si vous le souhaitez.",
     ],
   },
 ];
@@ -716,7 +506,8 @@ btnOnboardNext.addEventListener("click", () => {
 
 btnShowOnboarding.addEventListener("click", openOnboarding);
 
-// Window controls
+// ─── Window controls ────────────────────────────────────────────────────────
+
 btnMinimize.addEventListener("click", () => {
   invoke("hide_window").catch(console.error);
 });
@@ -725,14 +516,44 @@ btnClose.addEventListener("click", () => {
   invoke("quit_app").catch(console.error);
 });
 
-// Tauri events
+// ─── Tauri events ───────────────────────────────────────────────────────────
+
 listen<AgentSession[]>("agents-updated", (event) => {
   sessions = event.payload;
   render();
 });
 
-// Init
+/**
+ * Re-applies the persisted alwaysOnTop preference whenever the dashboard
+ * regains focus. The focus action temporarily disables alwaysOnTop so the
+ * IDE window can come to the foreground; once the user comes back to
+ * SynapseHub (tray click, Alt+Tab, etc.) we honour their toggle preference
+ * again.
+ */
+async function setupFocusListener(): Promise<void> {
+  try {
+    const win = getCurrentWindow();
+    await win.onFocusChanged(({ payload: focused }) => {
+      if (focused && getAlwaysOnTopPreference()) {
+        invoke("set_always_on_top", { onTop: true }).catch((err) =>
+          console.error("set_always_on_top(true) on focus failed:", err),
+        );
+      }
+    });
+  } catch (err) {
+    console.error("Failed to wire onFocusChanged listener:", err);
+  }
+}
+
+// ─── Init ───────────────────────────────────────────────────────────────────
+
 async function init(): Promise<void> {
+  // Restore the user's alwaysOnTop preference (handoff §5 — Fix 3).
+  // Default OFF; only invokes Rust when the user explicitly enabled it.
+  restoreAlwaysOnTopFromStorage(invoke);
+  syncAlwaysOnTopButton();
+  void setupFocusListener();
+
   try {
     sessions = await invoke<AgentSession[]>("get_sessions");
   } catch (err) {
@@ -751,3 +572,7 @@ async function init(): Promise<void> {
 }
 
 void init();
+
+// Re-export the storage key so callers (and tests) can clear the toggle
+// without hard-coding the literal.
+export { ALWAYS_ON_TOP_KEY };

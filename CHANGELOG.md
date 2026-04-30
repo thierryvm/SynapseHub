@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.0] - 2026-04-30
 
+### Fixed (pre-tag focus UX hardening)
+- **Click handler restreint au bouton focus** — la zone neutre des session cards (project name, path, IDE glyph, status pill) n'invoque plus rien au click. Avant le pre-tag fix, le listener était attaché à la fois à toute la `.session-card` ET au bouton focus, ce qui créait deux pièges UX révélés au smoke test v0.1.5 : (a) un click n'importe où sur la card déclenchait le flow focus + auto-hide, (b) le double listener pouvait fire en parallèle (bubble vs capture) et causait le bug intermittent "il faut le faire plusieurs fois". Le handler est maintenant uniquement sur `BUTTON[data-action="focus"]`. Le `keydown` Enter/Space reste sur la card pour préserver l'accessibilité clavier.
+- **alwaysOnTop dynamique au lieu de statique** — le flag dans `tauri.conf.json` est `false` par défaut. SynapseHub démarre comme une fenêtre normale qui peut passer en arrière-plan. Un toggle "Toujours au premier plan" dans le settings drawer permet d'activer le comportement HUD-overlay si l'utilisateur le souhaite. Préférence persistée dans `localStorage.synapsehub_always_on_top`. Avant, `alwaysOnTop: true` statique bloquait toutes les fenêtres tierces (y compris celles ramenées en Alt+Tab) — comportement invasif pour un companion tray tool.
+- **Action post-focus non destructive** — après un `focus_window === true`, on appelle désormais `set_always_on_top(false)` au lieu de `hide_window`. SynapseHub reste **visible** mais peut être recouverte par l'IDE, au lieu de disparaître complètement dans le tray. Récupération via Alt+Tab (workflow Windows natif) ou via le tray icon. Si le toggle utilisateur "Toujours au premier plan" est ON, la préférence est restaurée automatiquement quand SynapseHub regagne le focus (listener Tauri 2 `WebviewWindow::onFocusChanged`).
+- **Nouvelle commande Tauri `set_always_on_top(on_top: bool)`** dans `src-tauri/src/lib.rs`. Wrapper sur `WebviewWindow::set_always_on_top` avec `Result<(), String>` pour propagation propre des erreurs côté JS. Enregistrée dans `invoke_handler!`.
+
+### Refactor (pre-tag testability)
+- **`src/icons.ts` (nouveau)** — extraction des SVG builders (`svg`, `svgPath`, `svgCircle`, `svgLine`, `svgRect`, `buildBranchIcon`, `buildFocusIcon`, `buildCheckIcon`, `buildCopyIcon`, `buildBrandGlyph`) hors de `main.ts` pour réutilisation par `session-view.ts`. Zero `innerHTML`, security hook compliance préservée.
+- **`src/session-view.ts` augmenté** — nouveaux exports `renderSessionCard`, `attachFocusHandler`, `setAlwaysOnTopToggle`, `restoreAlwaysOnTopFromStorage`, `getAlwaysOnTopPreference`, `ALWAYS_ON_TOP_KEY`, type `InvokeFn`. Pattern dependency-injection sur la fonction `invoke` pour testabilité unitaire sans pull Tauri dans le test env.
+
 ### Changed
 - **UX/UI rework global** ([#30](https://github.com/thierryvm/SynapseHub/issues/30)) — refonte visuelle complète intégrée depuis le livrable Claude Design (claude.ai/design). Direction validée @thierry : Dark-first / hybride moderne / **cyan néon HUD subtil** (cohérent icône systray) / **Inter Display + JetBrains Mono Variable** / 4 piliers UX (adaptive density, responsive, settings drawer JSON, onboarding guide).
 - **Design tokens centralisés** dans `src/styles/tokens.css` (palette OKLCH dark + variant `[data-theme="light"]`, typographie, spacing 4px-base, radius, shadows, focus ring HUD, motion durations, layout, density modes). 9 fichiers de composants modulaires sous `src/styles/components/` (header, stats, toolbar, session-card, drawer, empty, onboarding, toast, footer).
@@ -34,10 +44,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Ancien settings modal** — remplacé par le drawer slide-in.
 
 ### Tests
-- Tests Rust : 43/43 inchangés (régression-zéro sur watcher, focus, hooks).
-- Tests Vitest : 7/7 inchangés (`session-view.ts` augmenté avec `getStatusDataAttr`, `getStatusLabelShort`, `ideKey`, `ideGlyph` — les utilitaires legacy `summarizeSessions`, `getStatusKey`, etc. restent exportés pour la compat tests).
-- Build vite : 14 KB HTML, 35 KB CSS (7 KB gzip), 20 KB JS (7.2 KB gzip).
-- `cargo build --features debug-devtools` valide la feature flag opt-in.
+- Tests Rust : 43/43 inchangés (régression-zéro sur watcher, focus, hooks). `cargo clippy --all-features --all-targets -- -D warnings` clean. `cargo check --features debug-devtools` clean.
+- **Tests Vitest : 7/7 → 16/16**. 9 nouveaux tests DOM dans `src/session-view.dom.test.ts` (env jsdom) — couverture du gap d'interaction surfacé après le smoke v0.1.5 :
+  - `click on .card-focus button triggers focus_window invoke`
+  - `click on neutral card area does NOT trigger focus_window`
+  - `focus_window true triggers set_always_on_top(false)` (vérifie aussi qu'`hide_window` n'est PLUS appelé — régression-check vs v0.1.5)
+  - `focus_window false does NOT trigger set_always_on_top` + `console.warn` émis
+  - `Waiting status triggers acknowledge_waiting before focus`
+  - `toggle ON saves to localStorage and invokes set_always_on_top(true)`
+  - `toggle OFF saves to localStorage and invokes set_always_on_top(false)`
+  - `on app load, restores localStorage 'true' preference`
+  - `default is alwaysOnTop OFF when no localStorage value (no Rust call)`
+- Anciens tests `session-view.test.ts` (formatDuration, projectNameFromPath, sortSessions, summarizeSessions) restent en env node natif, untouched.
+- `jsdom` ajouté en `devDependencies` (devOnly, free, standard, supports `addEventListener` + `dispatchEvent` + `querySelector`).
+- Build vite : 15.7 KB HTML / 35 KB CSS (7 KB gzip) / 34.4 KB JS (10.4 KB gzip — augmente vs v0.2.0 PR #31 dû à l'import `@tauri-apps/api/window` pour le listener `onFocusChanged`).
+
+### Documentation
+- Note d'investigation `analysis/2026-04-30-focus-ux-investigation.md` documente la confirmation des 4 hypothèses de bugs UX dans le code post-PR #31, le plan de fix retenu (Option A complète du handoff §5), et les risques identifiés (loop focus-changed, localStorage indispo, refactor renderSessionCard, jsdom CSS limitations).
 
 ## [0.1.4] - 2026-04-30
 

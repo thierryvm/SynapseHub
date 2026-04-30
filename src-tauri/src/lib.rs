@@ -54,6 +54,19 @@ fn hide_window(app: AppHandle) {
     }
 }
 
+/// Toggles the dashboard's `alwaysOnTop` flag at runtime. Driven by the user
+/// toggle in the settings drawer and by the focus action (which temporarily
+/// disables alwaysOnTop so the IDE window can come to the foreground without
+/// being covered by SynapseHub). Returns the standard string error so the
+/// frontend can log it.
+#[tauri::command]
+fn set_always_on_top(app: AppHandle, on_top: bool) -> Result<(), String> {
+    let win = app
+        .get_webview_window("dashboard")
+        .ok_or_else(|| "dashboard window not found".to_string())?;
+    win.set_always_on_top(on_top).map_err(|e| e.to_string())
+}
+
 /// Quits the application entirely.
 #[tauri::command]
 fn quit_app(app: AppHandle) {
@@ -258,6 +271,7 @@ pub fn run() {
             focus_window,
             acknowledge_waiting,
             hide_window,
+            set_always_on_top,
             quit_app,
             get_config,
         ])
