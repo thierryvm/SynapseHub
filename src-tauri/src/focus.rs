@@ -19,10 +19,7 @@ const MAX_PARENT_HOPS: u8 = 5;
 /// the foreground. Returns `true` if a window was actually focused.
 pub fn focus_window_by_pid(pid: u32) -> bool {
     let parents = collect_parent_chain(pid);
-    log::info!(
-        "focus_window_by_pid({pid}) — trying chain {:?}",
-        parents
-    );
+    log::info!("focus_window_by_pid({pid}) — trying chain {:?}", parents);
 
     for candidate in &parents {
         if focus_one(*candidate) {
@@ -42,14 +39,9 @@ pub fn focus_window_by_pid(pid: u32) -> bool {
 /// hops, excluding any PID we have already seen (cycle guard) and stopping
 /// at PID 0 / unknown processes.
 fn collect_parent_chain(pid: u32) -> Vec<u32> {
-    let refresh_kind =
-        RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing());
+    let refresh_kind = RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing());
     let mut sys = System::new_with_specifics(refresh_kind);
-    sys.refresh_processes_specifics(
-        ProcessesToUpdate::All,
-        true,
-        ProcessRefreshKind::nothing(),
-    );
+    sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
 
     let mut chain = Vec::with_capacity(MAX_PARENT_HOPS as usize + 1);
     chain.push(pid);
