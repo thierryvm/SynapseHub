@@ -1,4 +1,4 @@
-import { buildBranchIcon, buildFocusIcon } from "./icons";
+import { buildAlertIcon, buildBranchIcon, buildCheckIcon, buildCloseIcon, buildFocusIcon } from "./icons";
 
 export type AgentStatus =
   | { type: "Running"; since_secs: number }
@@ -428,4 +428,182 @@ export function getAlwaysOnTopPreference(): boolean {
   } catch {
     return false;
   }
+}
+
+// ─── v0.2.1 — update flow (#39 single-instance + clean update) ──────────────
+
+/** Persisted key that lets us detect "the version on disk just changed". */
+export const LAST_VERSION_KEY = "synapsehub_last_version";
+
+/** Default release page used as the fallback in update-failure toasts. */
+export const RELEASES_URL = "https://github.com/thierryvm/SynapseHub/releases";
+
+/** Subset of {@link Storage} we actually touch. Lets tests inject a fake. */
+export type StorageLike = Pick<Storage, "getItem" | "setItem">;
+
+/** Toast payload — a small, intentionally minimal object so the helper stays
+ * easy to assert on in unit tests. */
+export interface ToastOptions {
+  /** Visual + semantic tone. `info` is the default if omitted. */
+  tone?: "info" | "success" | "error";
+  title: string;
+  /** Optional second line. May contain `<a>` links via {@link link}. */
+  message?: string;
+  /** Auto-dismiss in ms. `0` means sticky (user closes via the X button). */
+  duration?: number;
+  /** Optional anchor displayed inside the message line. */
+  link?: { href: string; label: string };
+}
+
+/**
+ * Renders a toast inside `region` and (unless `duration === 0`) auto-dismisses
+ * it. Returns the created element so callers / tests can inspect it.
+ *
+ * Built entirely with `document.createElement` — no innerHTML, no DOM
+ * sanitiser dependency. The CSS lives in `src/styles/components/toast.css`.
+ */
+export function showToast(region: HTMLElement, opts: ToastOptions): HTMLElement {
+  const tone = opts.tone ?? "info";
+  const duration = opts.duration ?? 4000;
+
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.dataset.tone = tone;
+  el.setAttribute("role", "status");
+
+  const iconWrap = document.createElement("div");
+  iconWrap.className = "toast-icon";
+  iconWrap.appendChild(tone === "success" ? buildCheckIcon() : buildAlertIcon());
+  el.appendChild(iconWrap);
+
+  const body = document.createElement("div");
+  body.className = "toast-body";
+  const titleEl = document.createElement("div");
+  titleEl.className = "toast-title";
+  titleEl.textContent = opts.title;
+  body.appendChild(titleEl);
+  if (opts.message || opts.link) {
+    const msg = document.createElement("div");
+    msg.className = "toast-msg";
+    if (opts.message) msg.appendChild(document.createTextNode(opts.message));
+    if (opts.link) {
+      if (opts.message) msg.appendChild(document.createTextNode(" "));
+      const a = document.createElement("a");
+      a.href = opts.link.href;
+      a.textContent = opts.link.label;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      msg.appendChild(a);
+    }
+    body.appendChild(msg);
+  }
+  el.appendChild(body);
+
+  const close = document.createElement("button");
+  close.className = "toast-close";
+  close.type = "button";
+  close.setAttribute("aria-label", "Fermer");
+  close.appendChild(buildCloseIcon());
+  close.addEventListener("click", () => el.remove());
+  el.appendChild(close);
+
+  region.appendChild(el);
+
+  if (duration > 0) {
+    setTimeout(() => el.remove(), duration);
+  }
+
+  return el;
+}
+
+/**
+ * Click-handlers for the "Quitter et installer" modal.
+ *
+ * Wired separately from {@link openUpdateConfirmModal} (which is a thin
+ * CSS-class toggle in main.ts) so that the *behaviour* can be exercised by
+ * vitest without needing the full app shell mounted.
+ */
+export interface UpdateConfirmHandlers {
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+/** Wires the cancel + confirm buttons of the update-confirm modal. */
+export function attachUpdateConfirmHandlers(
+  cancelBtn: HTMLButtonElement,
+  confirmBtn: HTMLButtonElement,
+  handlers: UpdateConfirmHandlers,
+): void {
+  cancelBtn.addEventListener("click", handlers.onCancel);
+  confirmBtn.addEventListener("click", handlers.onConfirm);
+}
+
+/**
+ * Triggers the Tauri-side `quit_and_install_update` command and surfaces a
+ * toast on failure. Caller is responsible for downloading the update first
+ * (via `availableUpdate.downloadAndInstall(...)` from `@tauri-apps/plugin-updater`):
+ * this helper exists to make the *exit* step itself testable in isolation.
+ */
+export async function handleQuitAndInstall(
+  invokeFn: InvokeFn,
+  toastRegion: HTMLElement,
+): Promise<void> {
+  try {
+    await invokeFn("quit_and_install_update");
+  } catch (err) {
+    console.error("quit_and_install_update failed:", err);
+    showToast(toastRegion, {
+      tone: "error",
+      title: "Mise à jour échouée",
+      message: "Tu peux télécharger manuellement la dernière version sur",
+      link: { href: RELEASES_URL, label: "github.com/thierryvm/SynapseHub/releases" },
+      duration: 8000,
+    });
+  }
+}
+
+/**
+ * Compares the version remembered in `storage` (defaults to `localStorage`)
+ * with the running version. If they differ, surfaces a "Mise à jour réussie"
+ * toast and persists the new value. First-launch state (no stored value) is
+ * silent — we only stamp the storage so the *next* upgrade is detected.
+ *
+ * Returns `true` if the toast was shown, `false` otherwise (first launch,
+ * unchanged version, or storage unavailable).
+ */
+export function notifyUpdateSuccessIfNeeded(
+  currentVersion: string,
+  toastRegion: HTMLElement,
+  storage: StorageLike = localStorage,
+): boolean {
+  let stored: string | null;
+  try {
+    stored = storage.getItem(LAST_VERSION_KEY);
+  } catch {
+    return false;
+  }
+
+  if (stored && stored !== currentVersion) {
+    showToast(toastRegion, {
+      tone: "success",
+      title: "Mise à jour réussie",
+      message: `SynapseHub v${currentVersion} est maintenant actif.`,
+      duration: 3000,
+    });
+    try {
+      storage.setItem(LAST_VERSION_KEY, currentVersion);
+    } catch {
+      /* storage might be partially blocked — toast still showed, that's fine */
+    }
+    return true;
+  }
+
+  // First launch (stored === null) or unchanged: stamp the version so the
+  // next true upgrade is detected, but stay silent.
+  try {
+    storage.setItem(LAST_VERSION_KEY, currentVersion);
+  } catch {
+    /* no-op */
+  }
+  return false;
 }

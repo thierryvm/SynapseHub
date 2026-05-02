@@ -1,6 +1,6 @@
 [package]
 name = "synapsehub"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.80"
 
@@ -23,6 +23,7 @@ tauri            = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-notification = "2"
 tauri-plugin-updater      = "2"
 tauri-plugin-process      = "2"
+tauri-plugin-single-instance = "2"
 serde            = { version = "1", features = ["derive"] }
 serde_json       = "1"
 tokio            = { version = "1", features = ["full"] }
@@ -52,6 +53,12 @@ windows-sys = { version = "0.59", features = [
 # without binding a TCP listener. The base `tower` crate is already pulled
 # transitively by axum / tower-http; we just enable the `util` feature here.
 tower = { version = "0.5", features = ["util"] }
+
+# Pulls in `tauri::test::{mock_app, mock_builder, MockRuntime}` so we can
+# construct a real `App` / `AppHandle` in unit tests without binding a
+# webview. Dev-dependencies don't leak features into the production binary,
+# so this is safe to enable here.
+tauri = { version = "2", features = ["test"] }
 
 [profile.release]
 opt-level     = "s"

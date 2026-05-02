@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-01
+
+Hotfix sprint pour [#39](https://github.com/thierryvm/SynapseHub/issues/39) — single-instance lock + clean update flow. Adresse les deux régressions de cycle de vie observées sur v0.2.0 :
+- Lancer SynapseHub deux fois (raccourci, double-clic, démarrage Windows) ouvrait deux instances qui se battaient sur le même port hook + tray icon.
+- Cliquer "Installer la mise à jour" tuait l'app en cours sans confirmation et sans signaler à l'utilisateur que le redémarrage était volontaire.
+
+### Added
+- **`tauri-plugin-single-instance` v2** — première-classe dans la chaîne de plugins (`src-tauri/src/lib.rs`). Verrou OS (mutex Windows, socket UNIX macOS/Linux) posé avant tout autre init Tauri. Une 2ème tentative de lancement reçoit un refus immédiat ; le callback dans le process primary log `argv` + `cwd` rejetés et refocus la dashboard via `focus_primary_dashboard` (unminimize + show + set_focus). Évite la duplication watcher / hook server / tray icon. Helper `handle_second_instance_attempt(&AppHandle, &[String], &str)` extrait pour testabilité.
+- **Commande Tauri `quit_and_install_update`** (`src-tauri/src/lib.rs`) — appelée par le frontend après que le plugin updater a téléchargé + spawné l'installeur. Log explicite ("exiting cleanly so the installer can swap the binary") puis `app.exit(0)` — l'exit du process primary devient intentionnel et tracé, plutôt que de dépendre du comportement implicite du plugin updater. Générique sur `Runtime` pour tests sur `MockRuntime`.
+- **Modal de confirmation update** (`index.html` + `src/main.ts`) — clic sur "Installer la mise à jour" n'installe plus directement ; ouvre une modal qui explique que SynapseHub doit redémarrer pour que l'installeur remplace le binaire ("Tes sessions Claude détectées seront re-scannées au redémarrage."). Boutons **Annuler** (ferme la modal, garde l'état actuel) + **Quitter et installer** (download → `quit_and_install_update`). Dismissal Esc + clic backdrop, cohérent avec le drawer settings et l'onboarding modal.
+- **Toast post-update** (`src/main.ts`, `src/session-view.ts`) — au redémarrage après une mise à jour, comparaison `localStorage.synapsehub_last_version` vs version courante. Si la version a changé, surface un toast success "Mise à jour réussie · SynapseHub v{version} est maintenant actif." (3s auto-dismiss). Premier lancement silencieux mais stamp la version pour que le prochain upgrade soit détecté.
+- **Toasts** (`src/session-view.ts`) — système de toasts générique (`showToast(region, opts)`) avec tones `success | error`, icônes alert + close, lien optionnel, auto-dismiss configurable. Construit 100% via `document.createElement` (security hook compliant, zero `innerHTML`). Fallback erreur update : toast avec lien direct vers `github.com/thierryvm/SynapseHub/releases`.
+
+### Tests
+- **3 tests Rust** dans `src-tauri/src/lib.rs` : `focus_primary_dashboard_no_panic_when_window_absent`, `handle_second_instance_attempt_invokes_focus_without_panic`, `quit_and_install_update_returns_ok` (async, sur `MockRuntime`). Gated `#[cfg(not(target_os = "windows"))]` pour contourner un STATUS_ENTRYPOINT_NOT_FOUND déclenché par `tauri::test::mock_app()` + feature `tray-icon` sur les binaires de test Windows ; couverts par la matrice CI macOS + Linux x64 + Linux ARM64.
+- **6 tests Vitest** dans `src/session-view.dom.test.ts` : `attachUpdateConfirmHandlers wires both buttons`, `handleQuitAndInstall invokes the command`, `handleQuitAndInstall surfaces an error toast on reject` (avec lien fallback releases), `notifyUpdateSuccessIfNeeded shows toast on version change` (stamp persisté), `first launch silent but stamps`, `showToast renders icon + body + close`. 22 tests Vitest verts au total.
+
 ## [0.2.0] - 2026-04-30
 
 ### Fixed (pre-tag focus UX hardening)

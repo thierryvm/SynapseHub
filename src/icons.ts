@@ -129,6 +129,30 @@ export function buildCopyIcon(): SVGSVGElement {
   return s;
 }
 
+export function buildAlertIcon(): SVGSVGElement {
+  const s = svg("0 0 16 16", {
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.5",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+  });
+  svgPath(s, "M8 2L1.5 13.5h13L8 2z");
+  svgPath(s, "M8 6.5v3.5M8 12v.5");
+  return s;
+}
+
+export function buildCloseIcon(): SVGSVGElement {
+  const s = svg("0 0 16 16", {
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.6",
+    "stroke-linecap": "round",
+  });
+  svgPath(s, "M3.5 3.5l9 9M12.5 3.5l-9 9");
+  return s;
+}
+
 export function buildBrandGlyph(): SVGSVGElement {
   const s = svg("0 0 32 32", { fill: "none", xmlns: SVG_NS });
   svgCircle(s, 16, 16, 3.2, { fill: "currentColor" });

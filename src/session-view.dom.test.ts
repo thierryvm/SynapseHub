@@ -20,9 +20,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   ALWAYS_ON_TOP_KEY,
   attachFocusHandler,
+  attachUpdateConfirmHandlers,
+  handleQuitAndInstall,
+  LAST_VERSION_KEY,
+  notifyUpdateSuccessIfNeeded,
   renderSessionCard,
   restoreAlwaysOnTopFromStorage,
   setAlwaysOnTopToggle,
+  showToast,
   type AgentSession,
 } from "./session-view";
 
@@ -211,5 +216,141 @@ describe("AlwaysOnTop settings toggle", () => {
     // No invoke at all — the Tauri config already has alwaysOnTop=false,
     // so restoring "default" is a no-op and we must not flap the flag.
     expect(invokeMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── v0.2.1 hotfix (#39) — clean update flow ──────────────────────────────────
+
+function clearBody(): void {
+  while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
+}
+
+describe("Update confirm modal handlers", () => {
+  function makeButtons(): { cancelBtn: HTMLButtonElement; confirmBtn: HTMLButtonElement } {
+    const cancelBtn = document.createElement("button");
+    cancelBtn.id = "btn-update-cancel";
+    const confirmBtn = document.createElement("button");
+    confirmBtn.id = "btn-update-confirm";
+    document.body.appendChild(cancelBtn);
+    document.body.appendChild(confirmBtn);
+    return { cancelBtn, confirmBtn };
+  }
+
+  function makeToastRegion(): HTMLElement {
+    const region = document.createElement("div");
+    region.id = "toast-region";
+    document.body.appendChild(region);
+    return region;
+  }
+
+  afterEach(() => {
+    clearBody();
+  });
+
+  test("attachUpdateConfirmHandlers wires both cancel and confirm buttons", () => {
+    const { cancelBtn, confirmBtn } = makeButtons();
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
+
+    attachUpdateConfirmHandlers(cancelBtn, confirmBtn, { onCancel, onConfirm });
+
+    cancelBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    confirmBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    // cancel handler unaffected by the confirm click
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  test("handleQuitAndInstall invokes the quit_and_install_update command", async () => {
+    const region = makeToastRegion();
+    const invokeMock = vi.fn().mockResolvedValue(undefined);
+
+    await handleQuitAndInstall(invokeMock, region);
+
+    expect(invokeMock).toHaveBeenCalledWith("quit_and_install_update");
+    // Success path: no toast rendered.
+    expect(region.querySelectorAll(".toast").length).toBe(0);
+  });
+
+  test("handleQuitAndInstall surfaces an error toast when invoke rejects", async () => {
+    const region = makeToastRegion();
+    const invokeMock = vi.fn().mockRejectedValue(new Error("boom"));
+    // Silence the expected error log to keep test output clean.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await handleQuitAndInstall(invokeMock, region);
+
+    expect(invokeMock).toHaveBeenCalledWith("quit_and_install_update");
+    const toasts = region.querySelectorAll(".toast");
+    expect(toasts.length).toBe(1);
+    const toast = toasts[0];
+    expect(toast.getAttribute("data-tone")).toBe("error");
+    expect(toast.textContent).toContain("Mise à jour échouée");
+    // The fallback link must point at the public Releases page.
+    const link = toast.querySelector("a");
+    expect(link?.getAttribute("href")).toContain("github.com/thierryvm/SynapseHub/releases");
+    expect(errorSpy).toHaveBeenCalled();
+  });
+});
+
+describe("Post-update toast notification", () => {
+  function makeToastRegion(): HTMLElement {
+    const region = document.createElement("div");
+    region.id = "toast-region";
+    document.body.appendChild(region);
+    return region;
+  }
+
+  afterEach(() => {
+    clearBody();
+  });
+
+  test("shows success toast and stamps the new version when versions differ", () => {
+    const region = makeToastRegion();
+    localStorage.setItem(LAST_VERSION_KEY, "0.2.0");
+
+    const shown = notifyUpdateSuccessIfNeeded("0.2.1", region);
+
+    expect(shown).toBe(true);
+    const toasts = region.querySelectorAll(".toast");
+    expect(toasts.length).toBe(1);
+    expect(toasts[0].getAttribute("data-tone")).toBe("success");
+    expect(toasts[0].textContent).toContain("0.2.1");
+    expect(localStorage.getItem(LAST_VERSION_KEY)).toBe("0.2.1");
+  });
+
+  test("first launch is silent but stamps the version for next time", () => {
+    const region = makeToastRegion();
+    expect(localStorage.getItem(LAST_VERSION_KEY)).toBeNull();
+
+    const shown = notifyUpdateSuccessIfNeeded("0.2.1", region);
+
+    expect(shown).toBe(false);
+    expect(region.querySelectorAll(".toast").length).toBe(0);
+    // Storage is stamped so the next true upgrade triggers the toast.
+    expect(localStorage.getItem(LAST_VERSION_KEY)).toBe("0.2.1");
+  });
+
+  test("showToast renders the expected DOM shape (icon + body + close)", () => {
+    const region = makeToastRegion();
+
+    showToast(region, {
+      tone: "success",
+      title: "Test",
+      message: "Body",
+      duration: 0,
+    });
+
+    const toast = region.querySelector(".toast");
+    expect(toast).not.toBeNull();
+    expect(toast?.querySelector(".toast-icon")).not.toBeNull();
+    expect(toast?.querySelector(".toast-body")).not.toBeNull();
+    expect(toast?.querySelector(".toast-close")).not.toBeNull();
+    // Title + message are rendered as text nodes.
+    expect(toast?.querySelector(".toast-body")?.textContent).toContain("Test");
+    expect(toast?.querySelector(".toast-body")?.textContent).toContain("Body");
   });
 });
