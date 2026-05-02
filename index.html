@@ -276,6 +276,30 @@
       </div>
     </div>
 
+    <!-- ─────── Update confirm modal (v0.2.1 — fix #39) ─────── -->
+    <div
+      class="onboard-backdrop is-hidden"
+      id="update-confirm-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="update-confirm-title"
+    >
+      <div class="onboard" id="update-confirm-modal">
+        <div class="onboard-content" style="padding-top: var(--sp-6);">
+          <p class="onboard-eyebrow" id="update-confirm-eyebrow">Mise à jour disponible</p>
+          <h2 class="onboard-title" id="update-confirm-title">SynapseHub doit redémarrer</h2>
+          <p class="onboard-body" id="update-confirm-body">
+            La nouvelle version va être installée. Tes sessions Claude détectées seront re-scannées au redémarrage.
+          </p>
+        </div>
+        <div class="onboard-footer">
+          <span class="onboard-spacer"></span>
+          <button class="btn btn-ghost" id="btn-update-cancel" type="button">Annuler</button>
+          <button class="btn btn-primary" id="btn-update-confirm" type="button">Quitter et installer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast region -->
     <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="false"></div>
 

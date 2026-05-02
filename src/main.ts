@@ -7,10 +7,14 @@ import {
   type AgentSession,
   ALWAYS_ON_TOP_KEY,
   attachFocusHandler,
+  attachUpdateConfirmHandlers,
   getAlwaysOnTopPreference,
+  handleQuitAndInstall,
+  notifyUpdateSuccessIfNeeded,
   renderSessionCard,
   restoreAlwaysOnTopFromStorage,
   setAlwaysOnTopToggle,
+  showUpdateFailedToast,
   sortSessions,
 } from "./session-view";
 import { buildBrandGlyph, buildCheckIcon, buildCopyIcon } from "./icons";
@@ -61,6 +65,13 @@ const updateProgress = document.getElementById("update-progress") as HTMLElement
 const installRow = document.getElementById("install-row") as HTMLDivElement;
 const btnCheckUpdates = document.getElementById("btn-check-updates") as HTMLButtonElement;
 const btnInstallUpdate = document.getElementById("btn-install-update") as HTMLButtonElement;
+
+const updateConfirmBackdrop = document.getElementById("update-confirm-backdrop") as HTMLElement;
+const updateConfirmTitle = document.getElementById("update-confirm-title") as HTMLElement;
+const updateConfirmBody = document.getElementById("update-confirm-body") as HTMLElement;
+const btnUpdateCancel = document.getElementById("btn-update-cancel") as HTMLButtonElement;
+const btnUpdateConfirm = document.getElementById("btn-update-confirm") as HTMLButtonElement;
+const toastRegion = document.getElementById("toast-region") as HTMLElement;
 
 const onboardingBackdrop = document.getElementById("onboarding-backdrop") as HTMLElement;
 const onboardEyebrow = document.getElementById("onboard-eyebrow") as HTMLElement;
@@ -234,7 +245,9 @@ btnSettings.addEventListener("click", openDrawer);
 btnCloseDrawer.addEventListener("click", closeDrawer);
 drawerBackdrop.addEventListener("click", closeDrawer);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && drawer.dataset.open === "true") closeDrawer();
+  if (event.key !== "Escape") return;
+  if (drawer.dataset.open === "true") closeDrawer();
+  if (!updateConfirmBackdrop.classList.contains("is-hidden")) closeUpdateConfirmModal();
 });
 
 if (btnToggleAlwaysOnTop) {
@@ -335,7 +348,29 @@ async function checkForUpdates(userInitiated: boolean): Promise<void> {
   }
 }
 
-async function installUpdate(): Promise<void> {
+/**
+ * v0.2.1 update flow (#39): the "Installer" button no longer launches the
+ * install pipeline directly. It opens a confirmation modal that explains
+ * the app must quit before the installer can swap the binary, and only the
+ * "Quitter et installer" button in that modal triggers the actual download
+ * + install + clean exit sequence.
+ */
+function openUpdateConfirmModal(): void {
+  if (!availableUpdate) {
+    return;
+  }
+  updateConfirmTitle.textContent = `SynapseHub v${availableUpdate.version} est prêt`;
+  updateConfirmBody.textContent =
+    "SynapseHub doit se fermer pour que l'installeur puisse remplacer le binaire. Tes sessions Claude détectées seront re-scannées au redémarrage.";
+  updateConfirmBackdrop.classList.remove("is-hidden");
+}
+
+function closeUpdateConfirmModal(): void {
+  updateConfirmBackdrop.classList.add("is-hidden");
+}
+
+async function confirmInstallAndQuit(): Promise<void> {
+  closeUpdateConfirmModal();
   if (isInstallingUpdate) return;
   if (!availableUpdate) {
     await checkForUpdates(true);
@@ -352,6 +387,11 @@ async function installUpdate(): Promise<void> {
   );
 
   try {
+    // Download + spawn installer via the Tauri updater plugin. On Windows
+    // the NSIS installer needs the running binary to release its file lock,
+    // so we follow up with `quit_and_install_update` to make our exit
+    // explicit (logged + app.exit(0)) instead of relying on the plugin
+    // doing it implicitly.
     await availableUpdate.downloadAndInstall((event) => {
       switch (event.event) {
         case "Started":
@@ -369,22 +409,20 @@ async function installUpdate(): Promise<void> {
               : `Téléchargement: ${formatBytes(downloadedBytes)}`;
           break;
         case "Finished":
-          updateProgress.textContent = "Paquet reçu, installation locale en cours…";
+          updateProgress.textContent = "Paquet reçu, redémarrage…";
           break;
       }
     });
-    availableUpdate = null;
-    setUpdateDisplay(
-      "Mise à jour installée",
-      "Relancez SynapseHub si le redémarrage n'est pas automatique sur votre machine.",
-      lastUpdateCheckLabel,
-    );
+    // If we get here, the installer has been spawned. Ask Rust to exit
+    // cleanly so the file lock is released before NSIS proceeds.
+    await handleQuitAndInstall(invoke, toastRegion);
   } catch (err) {
     setUpdateDisplay(
       "Installation interrompue",
       "La mise à jour n'a pas pu être appliquée. La version actuelle reste intacte.",
       "Consultez la console pour le détail technique.",
     );
+    showUpdateFailedToast(toastRegion);
     console.error("Failed to install update:", err);
   } finally {
     isInstallingUpdate = false;
@@ -399,7 +437,18 @@ function formatBytes(bytes: number): string {
 }
 
 btnCheckUpdates.addEventListener("click", () => void checkForUpdates(true));
-btnInstallUpdate.addEventListener("click", () => void installUpdate());
+btnInstallUpdate.addEventListener("click", () => openUpdateConfirmModal());
+
+attachUpdateConfirmHandlers(btnUpdateCancel, btnUpdateConfirm, {
+  onCancel: closeUpdateConfirmModal,
+  onConfirm: () => void confirmInstallAndQuit(),
+});
+
+// Esc + backdrop click also dismiss the modal (consistency with the drawer
+// and onboarding modal patterns).
+updateConfirmBackdrop.addEventListener("click", (event) => {
+  if (event.target === updateConfirmBackdrop) closeUpdateConfirmModal();
+});
 
 // ─── Onboarding (3 slides, persisted in localStorage) ─────────────────
 
@@ -561,6 +610,11 @@ async function init(): Promise<void> {
     sessions = [];
   }
   render();
+
+  // v0.2.1 update flow (#39): if the previous run stamped a different
+  // version in localStorage, surface a quiet "updated to vX" toast and
+  // refresh the stored value. First launch silently stamps without toasting.
+  notifyUpdateSuccessIfNeeded(packageJson.version, toastRegion);
 
   try {
     if (!localStorage.getItem(ONBOARDING_FLAG)) openOnboarding();
