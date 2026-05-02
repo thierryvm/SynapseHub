@@ -54,6 +54,70 @@ fn hide_window(app: AppHandle) {
     }
 }
 
+/// Standard OS-native minimize for the dashboard window. Different from
+/// `hide_window`: this collapses the window to the taskbar (Windows) / Dock
+/// (macOS) / system tray icon (Linux) using the platform's normal minimize
+/// behaviour, instead of fully hiding it. Used by the minimize button when
+/// the user has enabled "Garder dans la barre des tâches" in settings.
+#[tauri::command]
+fn minimize_window<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    let win = app
+        .get_webview_window("dashboard")
+        .ok_or_else(|| "dashboard window not found".to_string())?;
+    win.minimize().map_err(|e| e.to_string())
+}
+
+/// Toggles the dashboard between maximized and normal states. Returns the
+/// new state so the frontend can swap the button icon (single square ↔
+/// overlapping squares) without a separate poll. Errors are propagated as
+/// strings so the JS handler can log them.
+#[tauri::command]
+fn toggle_maximize<R: Runtime>(app: AppHandle<R>) -> Result<bool, String> {
+    let win = app
+        .get_webview_window("dashboard")
+        .ok_or_else(|| "dashboard window not found".to_string())?;
+    let was_maximized = win.is_maximized().map_err(|e| e.to_string())?;
+    if was_maximized {
+        win.unmaximize().map_err(|e| e.to_string())?;
+        Ok(false)
+    } else {
+        win.maximize().map_err(|e| e.to_string())?;
+        Ok(true)
+    }
+}
+
+/// Toggles whether the dashboard appears in the OS taskbar (Windows) / Dock
+/// (macOS) / pager (Linux). Default OFF preserves the tray-companion
+/// pattern; ON makes SynapseHub a regular windowed app that shows up in
+/// Alt+Tab and the taskbar.
+///
+/// On macOS we additionally flip the activation policy: `Regular` (Dock
+/// icon visible, app appears in Cmd+Tab) when keep=true, `Accessory` (no
+/// Dock icon, equivalent to skipTaskbar) when keep=false. Without this the
+/// `set_skip_taskbar(false)` call alone has no visible effect on macOS,
+/// because the activation policy set in `setup` already pinned the app to
+/// Accessory.
+#[tauri::command]
+fn set_keep_taskbar<R: Runtime>(app: AppHandle<R>, keep: bool) -> Result<(), String> {
+    let win = app
+        .get_webview_window("dashboard")
+        .ok_or_else(|| "dashboard window not found".to_string())?;
+    win.set_skip_taskbar(!keep).map_err(|e| e.to_string())?;
+
+    #[cfg(target_os = "macos")]
+    {
+        let policy = if keep {
+            tauri::ActivationPolicy::Regular
+        } else {
+            tauri::ActivationPolicy::Accessory
+        };
+        app.set_activation_policy(policy)
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
 /// Toggles the dashboard's `alwaysOnTop` flag at runtime. Driven by the user
 /// toggle in the settings drawer and by the focus action (which temporarily
 /// disables alwaysOnTop so the IDE window can come to the foreground without
@@ -335,6 +399,9 @@ pub fn run() {
             focus_window,
             acknowledge_waiting,
             hide_window,
+            minimize_window,
+            toggle_maximize,
+            set_keep_taskbar,
             set_always_on_top,
             quit_app,
             quit_and_install_update,
@@ -469,6 +536,53 @@ mod tests {
             let args = vec!["synapsehub".to_string(), "--from-shortcut".to_string()];
             let cwd = "/home/thier".to_string();
             handle_second_instance_attempt(app.handle(), &args, &cwd);
+        }
+    }
+
+    // ─── v0.3.0 Vague 1 (#33 + #34) — frame controls + taskbar toggle ───────
+    //
+    // Same Windows-test-binary constraint as the single-instance helpers
+    // above: `tauri::test::mock_app()` trips STATUS_ENTRYPOINT_NOT_FOUND on
+    // Windows. We keep these gated to non-Windows and rely on the CI matrix
+    // (macOS + Linux x64 + Linux ARM64) to exercise them. The happy paths
+    // depend on real `WebviewWindow` operations (`minimize`, `is_maximized`,
+    // `set_skip_taskbar`) which `MockRuntime` does not implement, so we
+    // assert on the err branch only — the mock app has no "dashboard"
+    // window, so each command must surface the canonical not-found message
+    // instead of panicking.
+
+    #[cfg(not(target_os = "windows"))]
+    mod vague_1_window_controls_mock_app {
+        use super::*;
+
+        #[test]
+        fn minimize_window_errors_when_dashboard_window_absent() {
+            let app = tauri::test::mock_app();
+            let err = minimize_window(app.handle().clone()).unwrap_err();
+            assert!(
+                err.contains("dashboard window not found"),
+                "unexpected error: {err}"
+            );
+        }
+
+        #[test]
+        fn toggle_maximize_errors_when_dashboard_window_absent() {
+            let app = tauri::test::mock_app();
+            let err = toggle_maximize(app.handle().clone()).unwrap_err();
+            assert!(
+                err.contains("dashboard window not found"),
+                "unexpected error: {err}"
+            );
+        }
+
+        #[test]
+        fn set_keep_taskbar_errors_when_dashboard_window_absent() {
+            let app = tauri::test::mock_app();
+            let err = set_keep_taskbar(app.handle().clone(), true).unwrap_err();
+            assert!(
+                err.contains("dashboard window not found"),
+                "unexpected error: {err}"
+            );
         }
     }
 }

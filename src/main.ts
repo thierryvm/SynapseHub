@@ -9,11 +9,15 @@ import {
   attachFocusHandler,
   attachUpdateConfirmHandlers,
   getAlwaysOnTopPreference,
+  getKeepTaskbarPreference,
   handleQuitAndInstall,
   notifyUpdateSuccessIfNeeded,
   renderSessionCard,
   restoreAlwaysOnTopFromStorage,
+  restoreKeepTaskbarFromStorage,
   setAlwaysOnTopToggle,
+  setKeepTaskbarToggle,
+  setMaximizeButtonState,
   showUpdateFailedToast,
   sortSessions,
 } from "./session-view";
@@ -47,6 +51,7 @@ const footerDetail = document.getElementById("footer-detail") as HTMLElement;
 const versionLabel = document.getElementById("version-label") as HTMLElement;
 
 const btnMinimize = document.getElementById("btn-minimize") as HTMLButtonElement;
+const btnMaximize = document.getElementById("btn-maximize") as HTMLButtonElement;
 const btnClose = document.getElementById("btn-close") as HTMLButtonElement;
 const btnSettings = document.getElementById("btn-settings") as HTMLButtonElement;
 const btnShowOnboarding = document.getElementById("btn-show-onboarding") as HTMLButtonElement;
@@ -58,6 +63,7 @@ const btnCopyConfig = document.getElementById("btn-copy-config") as HTMLButtonEl
 const configCode = document.getElementById("config-code") as HTMLElement;
 const modalStatus = document.getElementById("modal-status") as HTMLElement;
 const btnToggleAlwaysOnTop = document.getElementById("btn-toggle-always-on-top") as HTMLButtonElement;
+const btnToggleKeepTaskbar = document.getElementById("btn-toggle-keep-taskbar") as HTMLButtonElement;
 
 const updateSummary = document.getElementById("update-summary") as HTMLElement;
 const updateMeta = document.getElementById("update-meta") as HTMLElement;
@@ -226,11 +232,18 @@ function syncAlwaysOnTopButton(): void {
   btnToggleAlwaysOnTop.setAttribute("aria-pressed", String(on));
 }
 
+function syncKeepTaskbarButton(): void {
+  if (!btnToggleKeepTaskbar) return;
+  const keep = getKeepTaskbarPreference();
+  btnToggleKeepTaskbar.setAttribute("aria-pressed", String(keep));
+}
+
 function openDrawer(): void {
   drawer.dataset.open = "true";
   drawer.setAttribute("aria-hidden", "false");
   drawerBackdrop.dataset.open = "true";
   syncAlwaysOnTopButton();
+  syncKeepTaskbarButton();
   void loadConfig();
   void checkForUpdates(false);
 }
@@ -255,6 +268,14 @@ if (btnToggleAlwaysOnTop) {
     const next = btnToggleAlwaysOnTop.getAttribute("aria-pressed") !== "true";
     btnToggleAlwaysOnTop.setAttribute("aria-pressed", String(next));
     setAlwaysOnTopToggle(next, invoke);
+  });
+}
+
+if (btnToggleKeepTaskbar) {
+  btnToggleKeepTaskbar.addEventListener("click", () => {
+    const next = btnToggleKeepTaskbar.getAttribute("aria-pressed") !== "true";
+    btnToggleKeepTaskbar.setAttribute("aria-pressed", String(next));
+    setKeepTaskbarToggle(next, invoke);
   });
 }
 
@@ -557,8 +578,32 @@ btnShowOnboarding.addEventListener("click", openOnboarding);
 
 // ─── Window controls ────────────────────────────────────────────────────────
 
+/**
+ * Minimize behaviour follows the user's "Garder dans la barre des tâches"
+ * preference (#34, Vague 1 v0.3.0):
+ * - Preference OFF (default tray-companion mode): hide_window sends the
+ *   dashboard to the tray entirely.
+ * - Preference ON: minimize_window performs an OS-native minimize so the
+ *   window collapses into the taskbar / Dock instead of disappearing.
+ *
+ * The preference is read live on each click rather than at startup so that
+ * toggling the setting takes effect immediately, without restart.
+ */
 btnMinimize.addEventListener("click", () => {
-  invoke("hide_window").catch(console.error);
+  if (getKeepTaskbarPreference()) {
+    invoke("minimize_window").catch(console.error);
+  } else {
+    invoke("hide_window").catch(console.error);
+  }
+});
+
+btnMaximize.addEventListener("click", async () => {
+  try {
+    const maximized = await invoke<boolean>("toggle_maximize");
+    setMaximizeButtonState(btnMaximize, maximized);
+  } catch (err) {
+    console.error("toggle_maximize failed:", err);
+  }
 });
 
 btnClose.addEventListener("click", () => {
@@ -594,6 +639,39 @@ async function setupFocusListener(): Promise<void> {
   }
 }
 
+/**
+ * Keeps the maximize button icon in sync with the actual window state.
+ * The user can maximize/restore via OS shortcuts (Win+Up, drag-to-edge,
+ * double-click titlebar on macOS) without going through our button, so we
+ * listen on `onResized` and re-query `isMaximized()` after each resize.
+ *
+ * The button starts in "maximize" state (single square SVG already in
+ * `index.html`); we only flip it when the runtime state diverges.
+ */
+async function setupMaximizeListener(): Promise<void> {
+  try {
+    const win = getCurrentWindow();
+    // Initial sync: if the window booted maximized (e.g. user closed the
+    // app while maximized — Tauri can preserve that state), reflect it.
+    try {
+      const initialMax = await win.isMaximized();
+      setMaximizeButtonState(btnMaximize, initialMax);
+    } catch (err) {
+      console.error("Initial isMaximized() probe failed:", err);
+    }
+    await win.onResized(async () => {
+      try {
+        const isMax = await win.isMaximized();
+        setMaximizeButtonState(btnMaximize, isMax);
+      } catch (err) {
+        console.error("onResized isMaximized() probe failed:", err);
+      }
+    });
+  } catch (err) {
+    console.error("Failed to wire onResized listener:", err);
+  }
+}
+
 // ─── Init ───────────────────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
@@ -602,6 +680,16 @@ async function init(): Promise<void> {
   restoreAlwaysOnTopFromStorage(invoke);
   syncAlwaysOnTopButton();
   void setupFocusListener();
+
+  // v0.3.0 Vague 1 (#34): restore "Garder dans la barre des tâches"
+  // preference. Default OFF (matches `tauri.conf.json` skipTaskbar: true);
+  // only invokes Rust when explicitly enabled.
+  restoreKeepTaskbarFromStorage(invoke);
+  syncKeepTaskbarButton();
+
+  // v0.3.0 Vague 1 (#33): keep the maximize button icon in sync with the
+  // OS-side window state, even when the user maximizes via shortcuts.
+  void setupMaximizeListener();
 
   try {
     sessions = await invoke<AgentSession[]>("get_sessions");

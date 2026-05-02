@@ -63,6 +63,11 @@
               <path d="M3 8h10" />
             </svg>
           </button>
+          <button class="win-btn" id="btn-maximize" data-action="maximize" aria-label="Agrandir" title="Agrandir" data-maximized="false">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3.5" y="3.5" width="9" height="9" rx="0.6" />
+            </svg>
+          </button>
           <button class="win-btn" id="btn-close" data-action="close" aria-label="Fermer">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
               <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
@@ -202,6 +207,19 @@
             ></button>
             <p class="setting-help">
               Garde SynapseHub par-dessus toutes les autres fenêtres. Désactivé par défaut pour ne pas bloquer le focus de l'IDE après un click flèche.
+            </p>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">Garder dans la barre des tâches</span>
+            <button
+              class="toggle"
+              id="btn-toggle-keep-taskbar"
+              type="button"
+              aria-pressed="false"
+              aria-label="Activer ou désactiver l'affichage dans la barre des tâches Windows ou le Dock macOS"
+            ></button>
+            <p class="setting-help">
+              Désactivé par défaut : SynapseHub reste un compagnon tray invisible et le bouton réduire l'envoie dans le tray. Activé : la fenêtre apparaît dans la barre des tâches Windows ou le Dock macOS, et le bouton réduire effectue un minimize OS classique.
             </p>
           </div>
         </section>

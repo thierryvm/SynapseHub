@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (v0.3.0 Vague 1 — #33 + #34)
+- **Frame: maximize/restore button** ([#33](https://github.com/thierryvm/SynapseHub/issues/33)) — bouton SVG inséré entre minimize et close. Icône swap automatique entre carré simple (état normal → "Agrandir") et double-carré chevauché (état maximisé → "Restaurer"). Sync via `WebviewWindow.onResized` listener pour rester aligné avec l'état réel même si l'utilisateur maximise via raccourci OS (Win+Up, drag-to-edge, double-click titlebar). Nouveaux helpers `buildMaximizeIcon` / `buildRestoreIcon` dans `src/icons.ts`, helper DI `setMaximizeButtonState(button, maximized)` dans `src/session-view.ts` (zero `innerHTML`).
+- **Settings: "Garder dans la barre des tâches" toggle (Option A)** ([#34](https://github.com/thierryvm/SynapseHub/issues/34)) — ajouté sous "Toujours au premier plan" dans le drawer settings. **OFF par défaut** : SynapseHub reste un compagnon tray invisible (comportement actuel préservé). **ON** : la fenêtre apparaît dans la barre des tâches Windows / Dock macOS, et le bouton réduire effectue un minimize OS classique au lieu d'envoyer dans le tray. Persistance `localStorage.synapsehub_keep_taskbar`. Helpers DI `setKeepTaskbarToggle`, `restoreKeepTaskbarFromStorage`, `getKeepTaskbarPreference`, constante `KEEP_TASKBAR_KEY` exportés depuis `src/session-view.ts` (pattern aligné sur `setAlwaysOnTopToggle`).
+- **Commande Tauri `toggle_maximize`** (`src-tauri/src/lib.rs`) — flippe entre maximisé et normal, retourne le nouvel état (`Result<bool, String>`) pour que le frontend swap l'icône sans poll séparé. Générique sur `R: Runtime` pour testabilité via `MockRuntime`.
+- **Commande Tauri `set_keep_taskbar(keep: bool)`** (`src-tauri/src/lib.rs`) — appelle `WebviewWindow::set_skip_taskbar(!keep)` ; sur macOS flippe aussi `app.set_activation_policy(Regular ↔ Accessory)` pour que le toggle soit visible (sans le 2ème op, `set_skip_taskbar(false)` seul est un no-op sur macOS car l'activation policy fixée en `setup` neutralise la visibilité). Générique sur `R: Runtime`.
+- **Commande Tauri `minimize_window`** (`src-tauri/src/lib.rs`) — minimize OS-natif, distinct de `hide_window` (qui envoie au tray). Utilisée quand l'utilisateur a activé "Garder dans la barre des tâches". Générique sur `R: Runtime`.
+
+### Changed
+- **Bouton minimize (`-`) respecte la nouvelle préférence "Garder dans la barre des tâches"** — preference OFF (défaut) : `hide_window` (tray, comportement v0.2.x préservé). Preference ON : `minimize_window` (minimize OS natif). La préférence est lue à chaque clic, donc le toggle prend effet immédiatement sans redémarrage. Logique dans `src/main.ts` ; choix arbitré Option β par @cowork (cohérence UX : si l'utilisateur a demandé la taskbar, il s'attend à un vrai minimize).
+
+### Tests (Vague 1)
+- **3 tests Rust err-only** dans `src-tauri/src/lib.rs` (module `vague_1_window_controls_mock_app`, gated `#[cfg(not(target_os = "windows"))]` — même contrainte que les helpers single-instance v0.2.1) : `minimize_window_errors_when_dashboard_window_absent`, `toggle_maximize_errors_when_dashboard_window_absent`, `set_keep_taskbar_errors_when_dashboard_window_absent`. Couvrent la branche `dashboard window not found` ; le happy path dépend de `WebviewWindow::{minimize, is_maximized, set_skip_taskbar}` que `MockRuntime` n'implémente pas, validé via Vitest (helpers DI) + smoke test @thierry.
+- **8 tests Vitest** dans `src/session-view.dom.test.ts` (env jsdom) : 5 sur `setKeepTaskbarToggle` / `restoreKeepTaskbarFromStorage` / `getKeepTaskbarPreference` (lifecycle ON/OFF + restore + default + preference probe), 3 sur `setMaximizeButtonState` (swap icône + aria-label + cleanup children). Pattern aligné sur les tests `AlwaysOnTop` v0.2.0.
+
 ## [0.2.1] - 2026-05-01
 
 Hotfix sprint pour [#39](https://github.com/thierryvm/SynapseHub/issues/39) — single-instance lock + clean update flow. Adresse les deux régressions de cycle de vie observées sur v0.2.0 :
