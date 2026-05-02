@@ -29,7 +29,38 @@
   gap: var(--sp-2);
   min-height: 86px;
   overflow: hidden;
-  transition: border-color var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: border-color var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    background var(--dur-base) var(--ease-out);
+}
+
+/* Reset native button visuals so the existing card layout takes over.
+   The two interactive cards (`button.stat-card`) are the click targets;
+   the third card stays as `<article>` (informative-only — option δ
+   arbitrated for v0.3.0 Vague 2b, projects-counter is not a status filter). */
+button.stat-card {
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+button.stat-card:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Active filter state — set by `setStatsCardActiveStates` based on the
+   persisted `synapsehub_active_filter` (sessionStorage). The visual treatment
+   uses `currentColor` so it picks up the per-tone palette already declared
+   for `[data-tone]` (mint / amber / cyan), no new tokens introduced. */
+button.stat-card[aria-pressed="true"] {
+  border-color: currentColor;
+  background: linear-gradient(180deg, var(--surface-3), var(--surface-2));
+  box-shadow: 0 0 0 1px currentColor, 0 0 14px -2px currentColor;
 }
 
 .stat-card::before {
@@ -116,3 +147,25 @@
 /* Compact density: shrink stat */
 [data-density="compact"] .stat-card { min-height: 60px; padding: var(--sp-3); }
 [data-density="compact"] .stat-value { font-size: var(--fs-22); }
+
+/* Empty-state shown when the filter is active and matches zero sessions
+   (option ε arbitrated for v0.3.0 Vague 2b — distinct from the global
+   "no sessions detected" empty state which targets the bootstrap UX). */
+.filter-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-6) var(--sp-4);
+  text-align: center;
+  color: var(--text-2);
+}
+
+.filter-empty-state.is-hidden {
+  display: none;
+}
+
+.filter-empty-msg {
+  font-size: var(--fs-13);
+  margin: 0;
+}

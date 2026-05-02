@@ -21,6 +21,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **3 tests Rust err-only** dans `src-tauri/src/lib.rs` (module `vague_1_window_controls_mock_app`, gated `#[cfg(not(target_os = "windows"))]` — même contrainte que les helpers single-instance v0.2.1) : `minimize_window_errors_when_dashboard_window_absent`, `toggle_maximize_errors_when_dashboard_window_absent`, `set_keep_taskbar_errors_when_dashboard_window_absent`. Couvrent la branche `dashboard window not found` ; le happy path dépend de `WebviewWindow::{minimize, is_maximized, set_skip_taskbar}` que `MockRuntime` n'implémente pas, validé via Vitest (helpers DI) + smoke test @thierry.
 - **8 tests Vitest** dans `src/session-view.dom.test.ts` (env jsdom) : 5 sur `setKeepTaskbarToggle` / `restoreKeepTaskbarFromStorage` / `getKeepTaskbarPreference` (lifecycle ON/OFF + restore + default + preference probe), 3 sur `setMaximizeButtonState` (swap icône + aria-label + cleanup children). Pattern aligné sur les tests `AlwaysOnTop` v0.2.0.
 
+### Added (v0.3.0 Vague 2b — closes [#35](https://github.com/thierryvm/SynapseHub/issues/35))
+
+- **Stats cards interactives en filter shortcuts** ([#35](https://github.com/thierryvm/SynapseHub/issues/35)) — les cartes "EN COURS" et "EN ATTENTE" sont désormais cliquables (transformées en `<button>` accessibles, `aria-pressed` dynamique, focus ring HUD) et appliquent un filter sur la session-list. Clic sur carte active = clear filter (option θ toggle behavior arbitrée @cowork). Visual highlight via tokens design system v0.2.0 (border `currentColor` + glow cyan/mint/amber selon `data-tone` + bg-tint, zero nouveau token). État persisté en `sessionStorage.synapsehub_active_filter` (PAS `localStorage` — reset au redémarrage app par design pour éviter UX collante après tray close + reopen).
+- **Empty state filter contextuel** — quand un filter actif matche zéro session (ex: "EN COURS" filter avec 0 session Running mais d'autres sessions Waiting visibles), affiche un message "Aucune session en cours actuellement" + bouton "Effacer le filtre" qui clear le filter et restaure la vue complète. Distinct du global empty-state ("Lancez Claude Code…") qui n'apparaît que quand le watcher voit zéro session totale.
+- **Carte "PROJETS SUIVIS" reste informative-only** — option δ arbitrée @cowork (le compteur de groupes de projets est sémantiquement différent d'un statut de session, transformer en filter serait conceptuellement étrange). La carte reste un `<article>` non-interactif. Un futur group-by-project ergonomique (expand/collapse) sera traité comme feature dédiée v0.4.0+ si besoin réel observé.
+- **Helpers DI dans `src/session-view.ts`** : type `ActiveFilter = "running" | "waiting" | null`, constante `ACTIVE_FILTER_KEY`, fonctions `getActiveFilter` / `setActiveFilter` / `clearActiveFilter` (avec injection `StorageLike` pour testabilité), `filterSessions(sessions, filter)`, `setStatsCardActiveStates(cards, filter)`, `nextFilterAfterClick(current, clicked)` (pure function pour la logique toggle θ).
+- **Élargissement type `StorageLike`** : ajout `removeItem` à `Pick<Storage, …>` pour supporter `setActiveFilter(null)` qui supprime l'entrée sessionStorage (au lieu d'écrire une string vide).
+
+### Tests (Vague 2b)
+
+- **17 nouveaux tests Vitest** dans `src/session-view.dom.test.ts` (env jsdom) — total 30 → 47 :
+  - 6 sur la persistance filter (sessionStorage round-trip ON/OFF, clear, default null, validation valeur invalide, anti-cross-contamination avec localStorage)
+  - 4 sur `filterSessions` (passthrough null, "running" / "waiting" filtering, empty array)
+  - 3 sur `nextFilterAfterClick` (toggle clear sur card active, swap sans null intermédiaire, activation depuis null)
+  - 4 sur `setStatsCardActiveStates` (running aria-pressed, waiting aria-pressed, null clear both, round-trip sequence)
+
 ### Tests (Vague 2a — refs [#43](https://github.com/thierryvm/SynapseHub/issues/43), opens [#45](https://github.com/thierryvm/SynapseHub/issues/45))
 
 Baseline test coverage pour `detect_ide_name` (`src-tauri/src/watcher.rs`). Les patterns `name_lower.contains(...)` pour Codex / Cursor / Windsurf / Aider / Cline / OpenHands existaient déjà mais sans tests dédiés ; ce bloc pin le comportement actuel comme baseline avant tout futur affinement (qui n'arrivera qu'avec data empirique sur les invocations CLI bundled dans Node ou Python).

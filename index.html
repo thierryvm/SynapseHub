@@ -79,7 +79,14 @@
       <!-- ─────── Main ─────── -->
       <main class="app-main" id="app-main">
         <section class="stats-grid" aria-label="Résumé d'activité">
-          <article class="stat-card" data-tone="active">
+          <button
+            class="stat-card"
+            id="stat-card-active"
+            type="button"
+            data-tone="active"
+            aria-pressed="false"
+            aria-label="Filtrer les sessions en cours"
+          >
             <div class="stat-label">
               <svg class="stat-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
                 <path d="M9 1.5L3 9h4l-1 5.5L13 7H9l1-5.5z" />
@@ -90,8 +97,15 @@
               <span id="running-count">0</span><span class="stat-suffix" id="running-suffix"></span>
             </div>
             <div class="stat-meta"><span class="delta" id="running-meta">Aucune session active</span></div>
-          </article>
-          <article class="stat-card" data-tone="waiting">
+          </button>
+          <button
+            class="stat-card"
+            id="stat-card-waiting"
+            type="button"
+            data-tone="waiting"
+            aria-pressed="false"
+            aria-label="Filtrer les sessions en attente"
+          >
             <div class="stat-label">
               <svg class="stat-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3.5 12h9l-1-1.5V7.5a3.5 3.5 0 1 0-7 0v3L3.5 12z" />
@@ -101,7 +115,7 @@
             </div>
             <div class="stat-value"><span id="waiting-count">0</span></div>
             <div class="stat-meta"><span class="delta" id="waiting-meta">Aucun blocage détecté</span></div>
-          </article>
+          </button>
           <article class="stat-card" data-tone="projects">
             <div class="stat-label">
               <svg class="stat-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">
@@ -115,6 +129,10 @@
         </section>
 
         <section class="session-list" id="session-list" aria-label="Sessions détectées">
+          <div class="filter-empty-state is-hidden" id="filter-empty-state" role="status" aria-live="polite">
+            <p class="filter-empty-msg" id="filter-empty-msg">Aucune session ne correspond au filtre actif.</p>
+            <button class="btn btn-secondary" id="btn-clear-filter" type="button">Effacer le filtre</button>
+          </div>
           <div class="empty-state" id="empty-state">
             <div class="empty-illus" aria-hidden="true">
               <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
