@@ -517,6 +517,108 @@ export function setMaximizeButtonState(button: HTMLButtonElement, maximized: boo
   button.dataset.maximized = String(maximized);
 }
 
+// ─── v0.3.0 Vague 2b (#35) — interactive stats cards filter ──────────────────
+
+/**
+ * Active filter applied to the session list, driven by clicks on the
+ * "EN COURS" / "EN ATTENTE" stats cards. The "PROJETS SUIVIS" card is
+ * deliberately informative-only in this iteration (option δ arbitrated by
+ * @cowork — the projects counter is semantically different from a status
+ * filter; group-by-project as a UI feature is deferred to v0.4.0+ if real
+ * usage demand surfaces).
+ *
+ * `null` means "no filter — show all sessions".
+ */
+export type ActiveFilter = "running" | "waiting" | null;
+
+/** Persisted user preference for the active stats-card filter. */
+export const ACTIVE_FILTER_KEY = "synapsehub_active_filter";
+
+function isActiveFilterValue(value: string | null): value is "running" | "waiting" {
+  return value === "running" || value === "waiting";
+}
+
+/**
+ * Reads the persisted filter from `sessionStorage` (NOT `localStorage` — by
+ * spec, the filter must reset at app restart to avoid stale UX after a
+ * tray-icon close + reopen). Returns `null` when missing, invalid, or
+ * storage is unavailable.
+ */
+export function getActiveFilter(storage: StorageLike = sessionStorage): ActiveFilter {
+  try {
+    const stored = storage.getItem(ACTIVE_FILTER_KEY);
+    return isActiveFilterValue(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Writes the filter to `sessionStorage`. `null` clears the entry. Invalid
+ * values are ignored at the type level. Storage failures are swallowed —
+ * the runtime state in `main.ts` still drives the current render.
+ */
+export function setActiveFilter(filter: ActiveFilter, storage: StorageLike = sessionStorage): void {
+  try {
+    if (filter === null) {
+      storage.removeItem(ACTIVE_FILTER_KEY);
+    } else {
+      storage.setItem(ACTIVE_FILTER_KEY, filter);
+    }
+  } catch {
+    /* storage blocked — runtime state still applies */
+  }
+}
+
+/** Clears the persisted filter. Convenience wrapper around `setActiveFilter(null)`. */
+export function clearActiveFilter(storage: StorageLike = sessionStorage): void {
+  setActiveFilter(null, storage);
+}
+
+/**
+ * Returns the subset of sessions matching the active filter. `null` is a
+ * passthrough (returns the input array unchanged). The filter maps to the
+ * underlying `AgentStatus.type` discriminator: "running" → only `Running`,
+ * "waiting" → only `Waiting`. `Idle` sessions are not currently exposed by
+ * any filter — they remain visible only when `filter === null`.
+ */
+export function filterSessions(sessions: AgentSession[], filter: ActiveFilter): AgentSession[] {
+  if (filter === null) return sessions;
+  if (filter === "running") return sessions.filter((s) => s.status.type === "Running");
+  if (filter === "waiting") return sessions.filter((s) => s.status.type === "Waiting");
+  return sessions;
+}
+
+/**
+ * Toggles the `aria-pressed` attribute on the two interactive stats cards
+ * to reflect the current filter. The "projects" card is intentionally not
+ * passed in (option δ — non-interactive informative-only).
+ *
+ * Called both on direct user click (handler in main.ts) and on app boot
+ * (to restore the persisted state from sessionStorage).
+ */
+export function setStatsCardActiveStates(
+  cards: { running: HTMLButtonElement; waiting: HTMLButtonElement },
+  filter: ActiveFilter,
+): void {
+  cards.running.setAttribute("aria-pressed", String(filter === "running"));
+  cards.waiting.setAttribute("aria-pressed", String(filter === "waiting"));
+}
+
+/**
+ * Computes the next filter when the user clicks on a stats card.
+ * Implements option θ (toggle behavior arbitrated by @cowork):
+ *
+ * - Click on the currently active card → clear the filter (return `null`)
+ * - Click on a different card → swap filter to that card (no intermediate `null`)
+ *
+ * Pure function so the toggle logic stays unit-testable independent of
+ * the DOM and storage side-effects.
+ */
+export function nextFilterAfterClick(current: ActiveFilter, clicked: "running" | "waiting"): ActiveFilter {
+  return current === clicked ? null : clicked;
+}
+
 // ─── v0.2.1 — update flow (#39 single-instance + clean update) ──────────────
 
 /** Persisted key that lets us detect "the version on disk just changed". */
@@ -526,7 +628,7 @@ export const LAST_VERSION_KEY = "synapsehub_last_version";
 export const RELEASES_URL = "https://github.com/thierryvm/SynapseHub/releases";
 
 /** Subset of {@link Storage} we actually touch. Lets tests inject a fake. */
-export type StorageLike = Pick<Storage, "getItem" | "setItem">;
+export type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 /** Toast payload — a small, intentionally minimal object so the helper stays
  * easy to assert on in unit tests. */

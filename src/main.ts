@@ -4,20 +4,26 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import packageJson from "../package.json";
 import {
+  type ActiveFilter,
   type AgentSession,
   ALWAYS_ON_TOP_KEY,
   attachFocusHandler,
   attachUpdateConfirmHandlers,
+  filterSessions,
+  getActiveFilter,
   getAlwaysOnTopPreference,
   getKeepTaskbarPreference,
   handleQuitAndInstall,
+  nextFilterAfterClick,
   notifyUpdateSuccessIfNeeded,
   renderSessionCard,
   restoreAlwaysOnTopFromStorage,
   restoreKeepTaskbarFromStorage,
+  setActiveFilter,
   setAlwaysOnTopToggle,
   setKeepTaskbarToggle,
   setMaximizeButtonState,
+  setStatsCardActiveStates,
   showUpdateFailedToast,
   sortSessions,
 } from "./session-view";
@@ -29,6 +35,7 @@ let availableUpdate: Update | null = null;
 let lastUpdateCheckLabel = "Aucune vérification récente";
 let isCheckingUpdates = false;
 let isInstallingUpdate = false;
+let activeFilter: ActiveFilter = null;
 
 const APP_VERSION_LABEL = `v${packageJson.version}`;
 const ONBOARDING_FLAG = "synapsehub_onboarding_completed_v0.2.0";
@@ -38,6 +45,11 @@ const DENSITY_COMPACT_THRESHOLD = 10;
 const root = document.documentElement;
 const sessionList = document.getElementById("session-list") as HTMLElement;
 const emptyState = document.getElementById("empty-state") as HTMLElement;
+const filterEmptyState = document.getElementById("filter-empty-state") as HTMLElement;
+const filterEmptyMsg = document.getElementById("filter-empty-msg") as HTMLElement;
+const btnClearFilter = document.getElementById("btn-clear-filter") as HTMLButtonElement;
+const statCardActive = document.getElementById("stat-card-active") as HTMLButtonElement;
+const statCardWaiting = document.getElementById("stat-card-waiting") as HTMLButtonElement;
 const agentBadgeCount = document.getElementById("agent-badge-count") as HTMLElement;
 const runningCountEl = document.getElementById("running-count") as HTMLElement;
 const runningSuffix = document.getElementById("running-suffix") as HTMLElement;
@@ -132,15 +144,30 @@ function updateStats(): void {
 
 function render(): void {
   const sorted = sortSessions(sessions);
+  const filtered = filterSessions(sorted, activeFilter);
 
-  const isEmpty = sessions.length === 0;
-  emptyState.style.display = isEmpty ? "" : "none";
+  const noSessions = sessions.length === 0;
+  // The filter-empty case is *only* meaningful when sessions exist but none
+  // match the active filter — when there are zero sessions full stop, the
+  // bootstrap empty-state takes priority.
+  const filterMatchesNothing = !noSessions && activeFilter !== null && filtered.length === 0;
+
+  emptyState.style.display = noSessions ? "" : "none";
+  if (filterMatchesNothing) {
+    filterEmptyMsg.textContent =
+      activeFilter === "running"
+        ? "Aucune session en cours actuellement."
+        : "Aucune session en attente actuellement.";
+    filterEmptyState.classList.remove("is-hidden");
+  } else {
+    filterEmptyState.classList.add("is-hidden");
+  }
 
   const existingCards = sessionList.querySelectorAll(".session-card");
   existingCards.forEach((c) => c.remove());
 
-  if (!isEmpty) {
-    for (const s of sorted) {
+  if (!noSessions && !filterMatchesNothing) {
+    for (const s of filtered) {
       const card = renderSessionCard(s);
       attachFocusHandler(card, s, invoke);
       sessionList.appendChild(card);
@@ -152,6 +179,20 @@ function render(): void {
     sessions.length > 0
       ? `SynapseHub — ${sessions.length} session${sessions.length > 1 ? "s" : ""}`
       : "SynapseHub";
+}
+
+/**
+ * Applies the new filter state: persists to sessionStorage, syncs the
+ * stats-card aria-pressed flags, and re-renders the session list. The
+ * stats-card aria-pressed flags drive the CSS `[aria-pressed="true"]`
+ * highlight (border accent + cyan glow + bg tint) declared in
+ * `src/styles/components/stats.css`.
+ */
+function applyFilter(filter: ActiveFilter): void {
+  activeFilter = filter;
+  setActiveFilter(filter);
+  setStatsCardActiveStates({ running: statCardActive, waiting: statCardWaiting }, filter);
+  render();
 }
 
 // ─── Settings drawer ────────────────────────────────────────────────────────
@@ -610,6 +651,20 @@ btnClose.addEventListener("click", () => {
   invoke("quit_app").catch(console.error);
 });
 
+// ─── Stats-card filter (v0.3.0 Vague 2b — #35) ──────────────────────────────
+
+statCardActive.addEventListener("click", () => {
+  applyFilter(nextFilterAfterClick(activeFilter, "running"));
+});
+
+statCardWaiting.addEventListener("click", () => {
+  applyFilter(nextFilterAfterClick(activeFilter, "waiting"));
+});
+
+btnClearFilter.addEventListener("click", () => {
+  applyFilter(null);
+});
+
 // ─── Tauri events ───────────────────────────────────────────────────────────
 
 listen<AgentSession[]>("agents-updated", (event) => {
@@ -690,6 +745,13 @@ async function init(): Promise<void> {
   // v0.3.0 Vague 1 (#33): keep the maximize button icon in sync with the
   // OS-side window state, even when the user maximizes via shortcuts.
   void setupMaximizeListener();
+
+  // v0.3.0 Vague 2b (#35): restore the active filter from sessionStorage
+  // (NOT localStorage — by spec, the filter resets at app restart). This
+  // keeps the toggle state across in-app navigation (e.g. tray hide/show)
+  // but avoids stale UX after a true close + reopen.
+  activeFilter = getActiveFilter();
+  setStatsCardActiveStates({ running: statCardActive, waiting: statCardWaiting }, activeFilter);
 
   try {
     sessions = await invoke<AgentSession[]>("get_sessions");

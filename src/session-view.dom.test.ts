@@ -18,21 +18,29 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
+  ACTIVE_FILTER_KEY,
   ALWAYS_ON_TOP_KEY,
   attachFocusHandler,
   attachUpdateConfirmHandlers,
+  clearActiveFilter,
+  filterSessions,
+  getActiveFilter,
   getKeepTaskbarPreference,
   handleQuitAndInstall,
   KEEP_TASKBAR_KEY,
   LAST_VERSION_KEY,
+  nextFilterAfterClick,
   notifyUpdateSuccessIfNeeded,
   renderSessionCard,
   restoreAlwaysOnTopFromStorage,
   restoreKeepTaskbarFromStorage,
+  setActiveFilter,
   setAlwaysOnTopToggle,
   setKeepTaskbarToggle,
   setMaximizeButtonState,
+  setStatsCardActiveStates,
   showToast,
+  type ActiveFilter,
   type AgentSession,
 } from "./session-view";
 
@@ -62,6 +70,7 @@ async function flushMicrotasks(): Promise<void> {
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -471,5 +480,155 @@ describe("Maximize button state", () => {
     // Exactly one SVG child after each call (the previous content was cleared).
     expect(btn.children.length).toBe(1);
     expect(btn.children[0].tagName.toLowerCase()).toBe("svg");
+  });
+});
+
+// ─── v0.3.0 Vague 2b (#35) — interactive stats cards filter ──────────────────
+
+function makeSessions(): AgentSession[] {
+  return [
+    makeSession({ pid: 1, status: { type: "Running", since_secs: 10 }, project_name: "A" }),
+    makeSession({ pid: 2, status: { type: "Running", since_secs: 20 }, project_name: "B" }),
+    makeSession({ pid: 3, status: { type: "Waiting", since_secs: 30 }, project_name: "C" }),
+    makeSession({ pid: 4, status: { type: "Idle" }, project_name: "D" }),
+  ];
+}
+
+describe("Active filter persistence (sessionStorage)", () => {
+  test("default filter is null when storage is empty", () => {
+    expect(getActiveFilter()).toBeNull();
+  });
+
+  test("setActiveFilter writes to sessionStorage and getActiveFilter reads it back", () => {
+    setActiveFilter("running");
+    expect(sessionStorage.getItem(ACTIVE_FILTER_KEY)).toBe("running");
+    expect(getActiveFilter()).toBe("running");
+
+    setActiveFilter("waiting");
+    expect(sessionStorage.getItem(ACTIVE_FILTER_KEY)).toBe("waiting");
+    expect(getActiveFilter()).toBe("waiting");
+  });
+
+  test("setActiveFilter(null) removes the storage entry", () => {
+    setActiveFilter("running");
+    expect(sessionStorage.getItem(ACTIVE_FILTER_KEY)).toBe("running");
+
+    setActiveFilter(null);
+    expect(sessionStorage.getItem(ACTIVE_FILTER_KEY)).toBeNull();
+    expect(getActiveFilter()).toBeNull();
+  });
+
+  test("clearActiveFilter removes the storage entry", () => {
+    setActiveFilter("waiting");
+    clearActiveFilter();
+    expect(sessionStorage.getItem(ACTIVE_FILTER_KEY)).toBeNull();
+    expect(getActiveFilter()).toBeNull();
+  });
+
+  test("getActiveFilter returns null on invalid stored value", () => {
+    sessionStorage.setItem(ACTIVE_FILTER_KEY, "garbage");
+    expect(getActiveFilter()).toBeNull();
+  });
+
+  test("getActiveFilter does NOT cross-contaminate with localStorage", () => {
+    // Defence-in-depth: make sure we only read sessionStorage. If a future
+    // refactor accidentally reaches into localStorage, this catches it.
+    localStorage.setItem(ACTIVE_FILTER_KEY, "running");
+    expect(getActiveFilter()).toBeNull();
+  });
+});
+
+describe("filterSessions", () => {
+  test("null filter is a passthrough", () => {
+    const all = makeSessions();
+    expect(filterSessions(all, null)).toEqual(all);
+  });
+
+  test("'running' filter keeps only Running sessions", () => {
+    const all = makeSessions();
+    const filtered = filterSessions(all, "running");
+    expect(filtered).toHaveLength(2);
+    expect(filtered.every((s) => s.status.type === "Running")).toBe(true);
+  });
+
+  test("'waiting' filter keeps only Waiting sessions", () => {
+    const all = makeSessions();
+    const filtered = filterSessions(all, "waiting");
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].status.type).toBe("Waiting");
+  });
+
+  test("filter on empty sessions array returns empty array", () => {
+    expect(filterSessions([], "running")).toEqual([]);
+    expect(filterSessions([], "waiting")).toEqual([]);
+    expect(filterSessions([], null)).toEqual([]);
+  });
+});
+
+describe("nextFilterAfterClick toggle behavior (option θ)", () => {
+  test("click on currently-active card clears the filter", () => {
+    expect(nextFilterAfterClick("running", "running")).toBeNull();
+    expect(nextFilterAfterClick("waiting", "waiting")).toBeNull();
+  });
+
+  test("click on a different card swaps the filter without intermediate null", () => {
+    expect(nextFilterAfterClick("running", "waiting")).toBe("waiting");
+    expect(nextFilterAfterClick("waiting", "running")).toBe("running");
+  });
+
+  test("click on either card from null filter activates that card", () => {
+    expect(nextFilterAfterClick(null, "running")).toBe("running");
+    expect(nextFilterAfterClick(null, "waiting")).toBe("waiting");
+  });
+});
+
+describe("setStatsCardActiveStates aria-pressed", () => {
+  function makeStatCards(): { running: HTMLButtonElement; waiting: HTMLButtonElement } {
+    const running = document.createElement("button");
+    running.id = "stat-card-active";
+    running.setAttribute("aria-pressed", "false");
+    const waiting = document.createElement("button");
+    waiting.id = "stat-card-waiting";
+    waiting.setAttribute("aria-pressed", "false");
+    document.body.appendChild(running);
+    document.body.appendChild(waiting);
+    return { running, waiting };
+  }
+
+  afterEach(() => {
+    while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
+  });
+
+  test("running filter sets aria-pressed=true on running card only", () => {
+    const cards = makeStatCards();
+    setStatsCardActiveStates(cards, "running");
+    expect(cards.running.getAttribute("aria-pressed")).toBe("true");
+    expect(cards.waiting.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  test("waiting filter sets aria-pressed=true on waiting card only", () => {
+    const cards = makeStatCards();
+    setStatsCardActiveStates(cards, "waiting");
+    expect(cards.running.getAttribute("aria-pressed")).toBe("false");
+    expect(cards.waiting.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("null filter clears aria-pressed on both cards", () => {
+    const cards = makeStatCards();
+    cards.running.setAttribute("aria-pressed", "true");
+    cards.waiting.setAttribute("aria-pressed", "true");
+    setStatsCardActiveStates(cards, null);
+    expect(cards.running.getAttribute("aria-pressed")).toBe("false");
+    expect(cards.waiting.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  test("toggle round-trip preserves the right card per filter", () => {
+    const cards = makeStatCards();
+    const sequence: ActiveFilter[] = ["running", "waiting", null, "running"];
+    for (const f of sequence) {
+      setStatsCardActiveStates(cards, f);
+      expect(cards.running.getAttribute("aria-pressed")).toBe(String(f === "running"));
+      expect(cards.waiting.getAttribute("aria-pressed")).toBe(String(f === "waiting"));
+    }
   });
 });
