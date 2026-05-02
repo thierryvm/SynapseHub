@@ -153,6 +153,38 @@ export function buildCloseIcon(): SVGSVGElement {
   return s;
 }
 
+/** Single rounded square — the "maximize" affordance shown when the window
+ * is in its normal (non-maximized) state. Click swaps to {@link buildRestoreIcon}. */
+export function buildMaximizeIcon(): SVGSVGElement {
+  const s = svg("0 0 16 16", {
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.4",
+    "stroke-linejoin": "round",
+  });
+  svgRect(s, { x: "3.5", y: "3.5", width: "9", height: "9", rx: "0.6" });
+  return s;
+}
+
+/** Two overlapping squares — the "restore" affordance shown when the window
+ * is currently maximized. Matches the Windows convention (back square peeking
+ * out top-right, front square fully drawn bottom-left). */
+export function buildRestoreIcon(): SVGSVGElement {
+  const s = svg("0 0 16 16", {
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.4",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+  });
+  // Back square — only the top edge and the right edge are visible (the
+  // bottom-left corner is hidden behind the front square).
+  svgPath(s, "M6 3.5h6.5v6.5");
+  // Front square — fully drawn rounded rectangle.
+  svgRect(s, { x: "3.5", y: "6", width: "6.5", height: "6.5", rx: "0.6" });
+  return s;
+}
+
 export function buildBrandGlyph(): SVGSVGElement {
   const s = svg("0 0 32 32", { fill: "none", xmlns: SVG_NS });
   svgCircle(s, 16, 16, 3.2, { fill: "currentColor" });

@@ -1,4 +1,12 @@
-import { buildAlertIcon, buildBranchIcon, buildCheckIcon, buildCloseIcon, buildFocusIcon } from "./icons";
+import {
+  buildAlertIcon,
+  buildBranchIcon,
+  buildCheckIcon,
+  buildCloseIcon,
+  buildFocusIcon,
+  buildMaximizeIcon,
+  buildRestoreIcon,
+} from "./icons";
 
 export type AgentStatus =
   | { type: "Running"; since_secs: number }
@@ -428,6 +436,85 @@ export function getAlwaysOnTopPreference(): boolean {
   } catch {
     return false;
   }
+}
+
+// ─── v0.3.0 Vague 1 (#34) — keep-in-taskbar toggle ───────────────────────────
+
+/** Persisted user preference for the "Garder dans la barre des tâches" toggle. */
+export const KEEP_TASKBAR_KEY = "synapsehub_keep_taskbar";
+
+/**
+ * Persists the user preference and pushes it to the Rust side. Mirrors
+ * {@link setAlwaysOnTopToggle} so the two settings rows behave identically.
+ *
+ * Default OFF preserves the tray-companion pattern: SynapseHub stays out of
+ * the taskbar / Dock, minimize sends to tray. When ON, the window appears in
+ * the OS taskbar (Windows) or Dock (macOS), and the minimize button switches
+ * to OS-native minimize (handled in main.ts).
+ */
+export function setKeepTaskbarToggle(keep: boolean, invokeFn: InvokeFn): void {
+  try {
+    localStorage.setItem(KEEP_TASKBAR_KEY, String(keep));
+  } catch {
+    /* localStorage blocked — preference won't persist across launches but the
+       runtime call below still applies for the current session */
+  }
+  void invokeFn("set_keep_taskbar", { keep }).catch((err) =>
+    console.error("set_keep_taskbar failed:", err),
+  );
+}
+
+/**
+ * Reads the persisted preference at app start and pushes it to Rust if (and
+ * only if) the user explicitly enabled it. Default = OFF (matches
+ * `tauri.conf.json` `skipTaskbar: true`); we therefore skip the invoke when
+ * the value is missing or "false" to avoid touching the window state for a
+ * no-op.
+ */
+export function restoreKeepTaskbarFromStorage(invokeFn: InvokeFn): void {
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(KEEP_TASKBAR_KEY);
+  } catch {
+    return;
+  }
+  if (stored === "true") {
+    void invokeFn("set_keep_taskbar", { keep: true }).catch((err) =>
+      console.error("set_keep_taskbar failed:", err),
+    );
+  }
+}
+
+/** Reads the current persisted preference. Returns `false` when missing. */
+export function getKeepTaskbarPreference(): boolean {
+  try {
+    return localStorage.getItem(KEEP_TASKBAR_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+// ─── v0.3.0 Vague 1 (#33) — maximize/restore button state ────────────────────
+
+/**
+ * Swaps the maximize button SVG between "maximize" (single rounded square)
+ * and "restore" (two overlapping squares) and updates the accessible label.
+ * Drives both visual feedback and screen reader state.
+ *
+ * Built via `document.createElementNS` (no innerHTML, security hook compliant);
+ * the button's existing children are removed and the new SVG appended.
+ *
+ * The `data-maximized` attribute mirrors the state so CSS can theme the
+ * button differently if needed and tests can assert on it without inspecting
+ * the SVG markup directly.
+ */
+export function setMaximizeButtonState(button: HTMLButtonElement, maximized: boolean): void {
+  while (button.firstChild) button.removeChild(button.firstChild);
+  button.appendChild(maximized ? buildRestoreIcon() : buildMaximizeIcon());
+  const label = maximized ? "Restaurer" : "Agrandir";
+  button.setAttribute("aria-label", label);
+  button.setAttribute("title", label);
+  button.dataset.maximized = String(maximized);
 }
 
 // ─── v0.2.1 — update flow (#39 single-instance + clean update) ──────────────

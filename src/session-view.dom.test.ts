@@ -21,12 +21,17 @@ import {
   ALWAYS_ON_TOP_KEY,
   attachFocusHandler,
   attachUpdateConfirmHandlers,
+  getKeepTaskbarPreference,
   handleQuitAndInstall,
+  KEEP_TASKBAR_KEY,
   LAST_VERSION_KEY,
   notifyUpdateSuccessIfNeeded,
   renderSessionCard,
   restoreAlwaysOnTopFromStorage,
+  restoreKeepTaskbarFromStorage,
   setAlwaysOnTopToggle,
+  setKeepTaskbarToggle,
+  setMaximizeButtonState,
   showToast,
   type AgentSession,
 } from "./session-view";
@@ -352,5 +357,119 @@ describe("Post-update toast notification", () => {
     // Title + message are rendered as text nodes.
     expect(toast?.querySelector(".toast-body")?.textContent).toContain("Test");
     expect(toast?.querySelector(".toast-body")?.textContent).toContain("Body");
+  });
+});
+
+// ─── v0.3.0 Vague 1 (#34) — keep-in-taskbar toggle ───────────────────────────
+
+describe("KeepTaskbar settings toggle", () => {
+  test("toggle ON saves to localStorage and invokes set_keep_taskbar(keep: true)", () => {
+    const invokeMock = vi.fn().mockResolvedValue(undefined);
+
+    setKeepTaskbarToggle(true, invokeMock);
+
+    expect(localStorage.getItem(KEEP_TASKBAR_KEY)).toBe("true");
+    expect(invokeMock).toHaveBeenCalledWith("set_keep_taskbar", { keep: true });
+  });
+
+  test("toggle OFF saves to localStorage and invokes set_keep_taskbar(keep: false)", () => {
+    const invokeMock = vi.fn().mockResolvedValue(undefined);
+    localStorage.setItem(KEEP_TASKBAR_KEY, "true");
+
+    setKeepTaskbarToggle(false, invokeMock);
+
+    expect(localStorage.getItem(KEEP_TASKBAR_KEY)).toBe("false");
+    expect(invokeMock).toHaveBeenCalledWith("set_keep_taskbar", { keep: false });
+  });
+
+  test("on app load, restores localStorage 'true' preference", () => {
+    const invokeMock = vi.fn().mockResolvedValue(undefined);
+    localStorage.setItem(KEEP_TASKBAR_KEY, "true");
+
+    restoreKeepTaskbarFromStorage(invokeMock);
+
+    expect(invokeMock).toHaveBeenCalledWith("set_keep_taskbar", { keep: true });
+  });
+
+  test("default is keepTaskbar OFF when no localStorage value (no Rust call)", () => {
+    const invokeMock = vi.fn().mockResolvedValue(undefined);
+
+    restoreKeepTaskbarFromStorage(invokeMock);
+
+    // No invoke at all — the Tauri config already has skipTaskbar=true,
+    // so restoring "default" is a no-op and we must not flap the flag.
+    expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  test("getKeepTaskbarPreference returns false by default, true when stored", () => {
+    expect(getKeepTaskbarPreference()).toBe(false);
+
+    localStorage.setItem(KEEP_TASKBAR_KEY, "true");
+    expect(getKeepTaskbarPreference()).toBe(true);
+
+    localStorage.setItem(KEEP_TASKBAR_KEY, "false");
+    expect(getKeepTaskbarPreference()).toBe(false);
+  });
+});
+
+// ─── v0.3.0 Vague 1 (#33) — maximize/restore button state ────────────────────
+
+describe("Maximize button state", () => {
+  function makeButton(): HTMLButtonElement {
+    const btn = document.createElement("button");
+    btn.id = "btn-maximize";
+    btn.dataset.maximized = "false";
+    document.body.appendChild(btn);
+    return btn;
+  }
+
+  afterEach(() => {
+    while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
+  });
+
+  test("setMaximizeButtonState(true) swaps to restore icon + 'Restaurer' label", () => {
+    const btn = makeButton();
+    btn.appendChild(document.createTextNode("placeholder"));
+
+    setMaximizeButtonState(btn, true);
+
+    expect(btn.dataset.maximized).toBe("true");
+    expect(btn.getAttribute("aria-label")).toBe("Restaurer");
+    expect(btn.getAttribute("title")).toBe("Restaurer");
+    // Restore icon is built with both a path (back-square) and a rect (front-square).
+    const svg = btn.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg?.querySelector("path")).not.toBeNull();
+    expect(svg?.querySelector("rect")).not.toBeNull();
+    // Placeholder text node must be gone.
+    expect(btn.textContent?.includes("placeholder")).toBe(false);
+  });
+
+  test("setMaximizeButtonState(false) swaps to maximize icon + 'Agrandir' label", () => {
+    const btn = makeButton();
+    setMaximizeButtonState(btn, true);
+    expect(btn.dataset.maximized).toBe("true");
+
+    setMaximizeButtonState(btn, false);
+
+    expect(btn.dataset.maximized).toBe("false");
+    expect(btn.getAttribute("aria-label")).toBe("Agrandir");
+    expect(btn.getAttribute("title")).toBe("Agrandir");
+    // Maximize icon = single rect, no extra path.
+    const svg = btn.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg?.querySelectorAll("rect").length).toBe(1);
+    expect(svg?.querySelectorAll("path").length).toBe(0);
+  });
+
+  test("setMaximizeButtonState toggles back and forth without leftover children", () => {
+    const btn = makeButton();
+    setMaximizeButtonState(btn, true);
+    setMaximizeButtonState(btn, false);
+    setMaximizeButtonState(btn, true);
+
+    // Exactly one SVG child after each call (the previous content was cleared).
+    expect(btn.children.length).toBe(1);
+    expect(btn.children[0].tagName.toLowerCase()).toBe("svg");
   });
 });
