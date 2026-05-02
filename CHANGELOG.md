@@ -21,6 +21,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **3 tests Rust err-only** dans `src-tauri/src/lib.rs` (module `vague_1_window_controls_mock_app`, gated `#[cfg(not(target_os = "windows"))]` — même contrainte que les helpers single-instance v0.2.1) : `minimize_window_errors_when_dashboard_window_absent`, `toggle_maximize_errors_when_dashboard_window_absent`, `set_keep_taskbar_errors_when_dashboard_window_absent`. Couvrent la branche `dashboard window not found` ; le happy path dépend de `WebviewWindow::{minimize, is_maximized, set_skip_taskbar}` que `MockRuntime` n'implémente pas, validé via Vitest (helpers DI) + smoke test @thierry.
 - **8 tests Vitest** dans `src/session-view.dom.test.ts` (env jsdom) : 5 sur `setKeepTaskbarToggle` / `restoreKeepTaskbarFromStorage` / `getKeepTaskbarPreference` (lifecycle ON/OFF + restore + default + preference probe), 3 sur `setMaximizeButtonState` (swap icône + aria-label + cleanup children). Pattern aligné sur les tests `AlwaysOnTop` v0.2.0.
 
+### Tests (Vague 2a — refs [#43](https://github.com/thierryvm/SynapseHub/issues/43), opens [#45](https://github.com/thierryvm/SynapseHub/issues/45))
+
+Baseline test coverage pour `detect_ide_name` (`src-tauri/src/watcher.rs`). Les patterns `name_lower.contains(...)` pour Codex / Cursor / Windsurf / Aider / Cline / OpenHands existaient déjà mais sans tests dédiés ; ce bloc pin le comportement actuel comme baseline avant tout futur affinement (qui n'arrivera qu'avec data empirique sur les invocations CLI bundled dans Node ou Python).
+
+- **11 nouveaux tests Rust** dans `watcher::tests` :
+  - `detects_openai_codex_desktop_via_windowsapps_path` — Codex desktop OpenAI via Microsoft Store. Pattern OK ; le filtrage `resolve_project_path` (cwd dans WindowsApps = `system_path` rejeté) est tracké séparément en [#45](https://github.com/thierryvm/SynapseHub/issues/45) (v0.4.0 candidate)
+  - `detects_cursor_from_process_name` + `detects_cursor_subprocess` — Cursor.exe + sub-processes Electron `--type=renderer`
+  - `detects_windsurf_from_process_name` — Windsurf.exe (Codeium fork)
+  - `detects_aider_from_process_name_when_packaged` — pour les builds PyInstaller / pip-shim qui produisent un `aider.exe`
+  - `aider_python_module_invocation_currently_unmatched_regression_check` — bookmark régression : `python -m aider` sous `python.exe` n'est PAS matché par le pattern actuel ; le test pin ce comportement pour qu'un futur affinement (post-empirical-diagnostic) soit une flip intentionnelle de None → Some("Aider")
+  - `detects_cline_from_process_name` — pour le cas standalone hypothétique
+  - `cline_vscode_extension_currently_unmatched_regression_check` — bookmark régression : Cline en extension VSCode (host = `code.exe`) tombe sur le fallback "VSCode" actuel ; tracké pour refinement futur
+  - `detects_openhands_from_process_name` — pour les builds standalone PyInstaller
+  - `openhands_docker_host_currently_unmatched_regression_check` — bookmark régression : OpenHands Docker (host = `docker.exe`) hors scope du watcher (introspection `docker ps` requise)
+  - `does_not_misclassify_unrelated_node_processes` — sanity check : npm/Vite/MCP servers Node ne sont pas faux-positifs
+
+Les tests `*_currently_unmatched_regression_check` documentent intentionnellement les limites du pattern matching actuel comme bookmarks pour refinement futur — ils seront flippés positifs dès qu'on aura des cmd lines empiriques d'invocations Aider Python / Cline VSCode-extension / OpenHands non-Docker (cf. [#43](https://github.com/thierryvm/SynapseHub/issues/43) reste ouvert pour ce scope).
+
 ## [0.2.1] - 2026-05-01
 
 Hotfix sprint pour [#39](https://github.com/thierryvm/SynapseHub/issues/39) — single-instance lock + clean update flow. Adresse les deux régressions de cycle de vie observées sur v0.2.0 :

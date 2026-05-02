@@ -697,6 +697,178 @@ mod tests {
         );
     }
 
+    // ─── v0.3.0 Vague 2a (#43) — IDE detection coverage baseline ─────────────
+    //
+    // The 6 IDEs targeted by issue #43 (Codex / Cursor / Aider / Cline /
+    // OpenHands / Windsurf) had bare-minimum `name_lower.contains(...)`
+    // patterns prior to v0.3.0 but no dedicated tests. The block below pins
+    // the *current* behaviour as a regression baseline before the post-pwsh
+    // refinement round adds cmd-line aware patterns for Node-bundled and
+    // Python-bundled invocations. Tests labelled "*_currently_unmatched_*"
+    // are intentional bookmarks documenting where the current matcher falls
+    // short — they will be flipped to positive matches once empirical cmd
+    // lines from @thierry's diagnostic are merged in.
+
+    #[test]
+    fn detects_openai_codex_desktop_via_windowsapps_path() {
+        // OpenAI Codex desktop app is distributed via the Microsoft Store
+        // and installs under `WindowsApps/OpenAI.Codex_<version>/app/Codex.exe`.
+        // ProcessName lowercased is "codex" → caught by the existing
+        // `name_lower.contains("codex")` arm BEFORE the generic VSCode
+        // fallback. The desktop-app project resolution is a separate
+        // concern: `resolve_project_path` rejects WindowsApps cwd as a
+        // system path, so Codex desktop sessions still don't surface
+        // until v0.4.0+ adds lock-file-based desktop hooks (#43 §2).
+        assert_eq!(
+            detect_ide_name(
+                "codex.exe",
+                r#""c:\program files\windowsapps\openai.codex_26.429.2026.0_x64__2p2nqsd0c76g0\app\codex.exe""#
+            ),
+            Some("OpenAI Codex")
+        );
+    }
+
+    #[test]
+    fn detects_cursor_from_process_name() {
+        // Cursor ships as an Electron app with a real `Cursor.exe` host
+        // binary. ProcessName lowercased is "cursor.exe" or "cursor".
+        assert_eq!(detect_ide_name("cursor.exe", "cursor.exe"), Some("Cursor"));
+        assert_eq!(detect_ide_name("cursor", "cursor"), Some("Cursor"));
+    }
+
+    #[test]
+    fn detects_cursor_subprocess() {
+        // Cursor renderer / utility helpers inherit the same process name
+        // and add a `--type=…` Electron flag.
+        assert_eq!(
+            detect_ide_name(
+                "cursor.exe",
+                r#""c:\users\thier\appdata\local\programs\cursor\cursor.exe" --type=renderer"#
+            ),
+            Some("Cursor")
+        );
+    }
+
+    #[test]
+    fn detects_windsurf_from_process_name() {
+        // Windsurf is the Codeium fork of VSCode, also Electron-based.
+        // Distinct ProcessName "windsurf.exe" — not the generic "code.exe".
+        assert_eq!(
+            detect_ide_name("windsurf.exe", "windsurf.exe"),
+            Some("Windsurf")
+        );
+    }
+
+    #[test]
+    fn detects_aider_from_process_name_when_packaged() {
+        // PyInstaller / pip-shim packaging produces a real `aider.exe`
+        // binary on Windows. The pure-pip install path (`python -m aider`)
+        // requires cmd-line matching and is captured below as a regression
+        // bookmark — tracked for refinement once empirical cmd-line lands.
+        assert_eq!(
+            detect_ide_name("aider.exe", "aider --model gpt-4o"),
+            Some("Aider")
+        );
+        assert_eq!(detect_ide_name("aider", "aider"), Some("Aider"));
+    }
+
+    #[test]
+    fn aider_python_module_invocation_currently_unmatched_regression_check() {
+        // `python -m aider` and `python /path/to/aider/__main__.py` run
+        // under `python.exe`. The current `name_lower.contains("aider")`
+        // pattern does NOT match this invocation, so the watcher returns
+        // None and the session does not surface. This test pins today's
+        // behaviour so the post-empirical refinement is an intentional
+        // change (assertion will flip from None to Some("Aider")).
+        assert_eq!(
+            detect_ide_name("python.exe", "python -m aider --model gpt-4o"),
+            None
+        );
+        assert_eq!(
+            detect_ide_name(
+                "python.exe",
+                r#""c:\program files\python313\python.exe" "c:\users\thier\appdata\roaming\python\python313\scripts\aider.py" --model gpt-4o"#
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn detects_cline_from_process_name() {
+        // Hypothetical standalone packaging — captures the current pattern
+        // intent. The realistic VSCode-extension hosting path (`code.exe`
+        // + cline extension dir) is tracked separately as a regression
+        // bookmark below.
+        assert_eq!(detect_ide_name("cline.exe", "cline"), Some("Cline"));
+    }
+
+    #[test]
+    fn cline_vscode_extension_currently_unmatched_regression_check() {
+        // Cline ships as a VSCode extension. The host process is `code.exe`
+        // and `name_lower.contains("cline")` returns false. The dispatcher
+        // routes a bare `code.exe` to "VSCode" instead via the generic
+        // `name.contains("code")` arm. Pinned as a regression bookmark —
+        // post-empirical refinement will add a cmd-line check that lifts
+        // Cline above the VSCode fallback when its extension path appears
+        // in the args.
+        assert_eq!(
+            detect_ide_name(
+                "code.exe",
+                r#""c:\users\thier\appdata\local\programs\microsoft vs code\code.exe" --extension-id rooveterinaryinc.cline"#
+            ),
+            Some("VSCode")
+        );
+    }
+
+    #[test]
+    fn detects_openhands_from_process_name() {
+        // PyInstaller packaging produces a real `openhands.exe`. The
+        // realistic Docker container hosting path is tracked separately
+        // as a regression bookmark — `docker.exe` host is intentionally
+        // unmatched (out of scope for the watcher to introspect Docker).
+        assert_eq!(
+            detect_ide_name("openhands.exe", "openhands"),
+            Some("OpenHands")
+        );
+    }
+
+    #[test]
+    fn openhands_docker_host_currently_unmatched_regression_check() {
+        // OpenHands distributed as Docker container: visible process is
+        // `docker.exe`, not `openhands.exe`. Detecting an OpenHands
+        // container from the host side would require inspecting
+        // `docker ps` output, which is out of scope for the watcher.
+        // Pinned as a regression bookmark — this case is not a candidate
+        // for the post-empirical refinement.
+        assert_eq!(
+            detect_ide_name(
+                "docker.exe",
+                r#""docker" run -p 3000:3000 openhands/openhands-app:latest"#
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn does_not_misclassify_unrelated_node_processes() {
+        // Sanity check: a generic Node tool (npm dev server, Vite, etc.)
+        // that does NOT carry an Anthropic / Codex / agent signature in
+        // its cmd line must return None. This guards against future
+        // pattern additions accidentally over-matching `node.exe`.
+        assert_eq!(detect_ide_name("node.exe", "node"), None);
+        assert_eq!(
+            detect_ide_name("node.exe", "node /usr/local/bin/npm run dev"),
+            None
+        );
+        assert_eq!(
+            detect_ide_name(
+                "node.exe",
+                "node /usr/local/lib/node_modules/vite/bin/vite.js"
+            ),
+            None
+        );
+    }
+
     #[test]
     fn flags_system_locations_as_non_project_paths() {
         assert!(is_system_path("C:\\Program Files\\Codex"));
