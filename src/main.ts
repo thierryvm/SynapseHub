@@ -14,7 +14,7 @@ import {
   renderSessionCard,
   restoreAlwaysOnTopFromStorage,
   setAlwaysOnTopToggle,
-  showToast,
+  showUpdateFailedToast,
   sortSessions,
 } from "./session-view";
 import { buildBrandGlyph, buildCheckIcon, buildCopyIcon } from "./icons";
@@ -422,16 +422,7 @@ async function confirmInstallAndQuit(): Promise<void> {
       "La mise à jour n'a pas pu être appliquée. La version actuelle reste intacte.",
       "Consultez la console pour le détail technique.",
     );
-    showToast(toastRegion, {
-      tone: "error",
-      title: "Mise à jour échouée",
-      message: "Tu peux télécharger manuellement la dernière version sur",
-      link: {
-        href: "https://github.com/thierryvm/SynapseHub/releases",
-        label: "github.com/thierryvm/SynapseHub/releases",
-      },
-      duration: 8000,
-    });
+    showUpdateFailedToast(toastRegion);
     console.error("Failed to install update:", err);
   } finally {
     isInstallingUpdate = false;

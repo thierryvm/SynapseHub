@@ -539,6 +539,23 @@ export function attachUpdateConfirmHandlers(
 }
 
 /**
+ * Surfaces the canonical "update failed" toast: a fallback that points the
+ * user at the public Releases page so they can download manually. Shared
+ * between `handleQuitAndInstall` (the exit/install command failed) and the
+ * `confirmInstallAndQuit` catch block in `main.ts` (the download itself
+ * failed). Centralised so the wording and the link stay in sync.
+ */
+export function showUpdateFailedToast(toastRegion: HTMLElement): void {
+  showToast(toastRegion, {
+    tone: "error",
+    title: "Mise à jour échouée",
+    message: "Tu peux télécharger manuellement la dernière version sur",
+    link: { href: RELEASES_URL, label: "github.com/thierryvm/SynapseHub/releases" },
+    duration: 8000,
+  });
+}
+
+/**
  * Triggers the Tauri-side `quit_and_install_update` command and surfaces a
  * toast on failure. Caller is responsible for downloading the update first
  * (via `availableUpdate.downloadAndInstall(...)` from `@tauri-apps/plugin-updater`):
@@ -552,13 +569,7 @@ export async function handleQuitAndInstall(
     await invokeFn("quit_and_install_update");
   } catch (err) {
     console.error("quit_and_install_update failed:", err);
-    showToast(toastRegion, {
-      tone: "error",
-      title: "Mise à jour échouée",
-      message: "Tu peux télécharger manuellement la dernière version sur",
-      link: { href: RELEASES_URL, label: "github.com/thierryvm/SynapseHub/releases" },
-      duration: 8000,
-    });
+    showUpdateFailedToast(toastRegion);
   }
 }
 
