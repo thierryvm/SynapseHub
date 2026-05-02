@@ -92,11 +92,7 @@ fn focus_primary_dashboard<R: Runtime>(app: &AppHandle<R>) {
 /// Body of the `tauri-plugin-single-instance` callback, extracted so it can
 /// be unit-tested without spinning up a second OS process. Logs the rejected
 /// argv/cwd and refocuses the primary dashboard.
-fn handle_second_instance_attempt<R: Runtime>(
-    app: &AppHandle<R>,
-    args: &[String],
-    cwd: &str,
-) {
+fn handle_second_instance_attempt<R: Runtime>(app: &AppHandle<R>, args: &[String], cwd: &str) {
     log::info!(
         "second-instance launch refused — focusing primary (argv = {:?}, cwd = {:?})",
         args,
@@ -448,10 +444,7 @@ mod tests {
         #[test]
         fn handle_second_instance_attempt_invokes_focus_without_panic() {
             let app = tauri::test::mock_app();
-            let args = vec![
-                "synapsehub".to_string(),
-                "--from-shortcut".to_string(),
-            ];
+            let args = vec!["synapsehub".to_string(), "--from-shortcut".to_string()];
             let cwd = "/home/thier".to_string();
             handle_second_instance_attempt(app.handle(), &args, &cwd);
         }
